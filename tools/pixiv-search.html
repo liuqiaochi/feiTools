@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixiv 搜图 - 老肥工具箱</title>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --surface2: #f7f8fc;
+      --surface3: #eef0f5;
+      --border: #e0e0e0;
+      --accent: #667eea;
+      --accent-dim: rgba(102,126,234,0.1);
+      --text: #333333;
+      --text2: #888888;
+      --text3: #bbbbbb;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      padding: 28px 20px 20px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before { display: none; }
+
+    .logo-wrap { position: relative; }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 6px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+    }
+
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+
+    .logo-sub {
+      font-size: 0.75rem;
+      color: var(--text2);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    /* ── Search Box ── */
+    .search-wrap { max-width: 660px; margin: 0 auto; }
+
+    .search-box {
+      display: flex;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 50px;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-box:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
+    }
+
+    #searchInput {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 15px 22px;
+      font-size: 1rem;
+      color: var(--text);
+      caret-color: var(--accent);
+      font-family: inherit;
+    }
+
+    #searchInput::placeholder { color: var(--text3); }
+
+    #searchBtn {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      padding: 0 28px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      letter-spacing: 0.5px;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
+    #searchBtn:hover { background: #5a6fd6; }
+    #searchBtn:active { transform: scale(0.97); }
+    #searchBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      max-width: 900px;
+      margin: 18px auto 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .filter-label { color: var(--text2); font-size: 0.82rem; }
+
+    .filter-btn {
+      padding: 6px 16px;
+      border-radius: 50px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.18s;
+      font-family: inherit;
+    }
+
+    .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+    .filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Main ── */
+    main { max-width: 1600px; margin: 0 auto; padding: 24px 16px 60px; }
+
+    /* ── Status Bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      min-height: 26px;
+    }
+
+    .status-text { color: var(--text2); font-size: 0.88rem; }
+    .status-text strong { color: var(--text); }
+
+    /* ── Masonry Grid ── */
+    .masonry-grid {
+      columns: 5 220px;
+      column-gap: 12px;
+    }
+
+    @media (max-width: 1200px) { .masonry-grid { columns: 4 180px; } }
+    @media (max-width: 900px)  { .masonry-grid { columns: 3 160px; } }
+    @media (max-width: 600px)  { .masonry-grid { columns: 2 140px; } }
+
+    /* ── Card ── */
+    .image-card {
+      break-inside: avoid;
+      margin-bottom: 12px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.22s cubic-bezier(.2,.8,.3,1), box-shadow 0.22s;
+      display: block;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+
+    .image-card:hover {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 12px 36px rgba(0,0,0,.12);
+    }
+
+    .card-img-wrap {
+      position: relative;
+      width: 100%;
+      background: var(--surface2);
+    }
+
+    .card-img-wrap::before {
+      content: '';
+      display: block;
+    }
+
+    .card-img {
+      width: 100%;
+      display: block;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    .card-img.loaded { opacity: 1; }
+
+    .card-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+    }
+
+    .card-loading .spin {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .card-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 36px 10px 10px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.8));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .image-card:hover .card-overlay { opacity: 1; }
+
+    .card-title {
+      font-size: 0.78rem;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 3px;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* Badges */
+    .badge-r18 {
+      position: absolute;
+      top: 7px;
+      left: 7px;
+      background: rgba(220,50,50,0.85);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 50px;
+      backdrop-filter: blur(4px);
+    }
+
+    .badge-multi {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 3px 7px;
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    /* ── Empty / Loading / Error States ── */
+    .center-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text2);
+    }
+
+    .center-state .icon { font-size: 3.5rem; margin-bottom: 16px; opacity: 0.35; }
+    .center-state p { font-size: 1.05rem; margin-bottom: 8px; color: var(--text); }
+    .center-state small { font-size: 0.85rem; color: var(--text2); line-height: 1.6; }
+
+    .main-loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 80px 20px;
+      color: var(--text2);
+    }
+
+    .main-loader .big-spin {
+      width: 44px;
+      height: 44px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Load More ── */
+    .load-more-wrap { text-align: center; padding: 32px 0 8px; }
+
+    .load-more-btn {
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      color: var(--text2);
+      padding: 11px 44px;
+      border-radius: 50px;
+      font-size: 0.92rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .load-more-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+    .load-more-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(6px);
+    }
+
+    .modal-overlay.open { display: flex; animation: fadeIn 0.18s ease; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      width: min(96vw, 1100px);
+      max-height: 92vh;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+      animation: popIn 0.22s cubic-bezier(.2,.8,.3,1);
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.94); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+
+    .modal-left {
+      flex: 1;
+      min-width: 0;
+      background: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border-radius: 20px 0 0 20px;
+      max-width: 68%;
+    }
+
+    .modal-left img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      max-height: 92vh;
+      display: block;
+    }
+
+    .modal-left .img-loading {
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-right {
+      width: 310px;
+      flex-shrink: 0;
+      padding: 28px 22px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 34px;
+      height: 34px;
+      background: rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      color: var(--text);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.18s;
+      z-index: 10;
+    }
+
+    .modal-close:hover { background: rgba(0,0,0,0.12); }
+
+    /* Modal nav arrows */
+    .modal-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 40px;
+      height: 64px;
+      background: rgba(0,0,0,0.5);
+      border: none;
+      color: #fff;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.18s;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-nav:hover { background: rgba(102,126,234,0.7); }
+    .modal-nav.prev { left: 0; border-radius: 0 8px 8px 0; }
+    .modal-nav.next { right: 310px; border-radius: 8px 0 0 8px; }
+    .modal-nav:disabled { opacity: 0.2; cursor: default; }
+
+    .modal-platform {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 50px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(102,126,234,0.3);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      align-self: flex-start;
+    }
+
+    .modal-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .modal-author {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: var(--text2);
+    }
+
+    .modal-author a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .modal-author a:hover { text-decoration: underline; }
+
+    .modal-stats {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.82rem;
+      color: var(--text2);
+    }
+
+    .modal-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 3px 10px;
+      border-radius: 50px;
+      font-size: 0.74rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+
+    .tag:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+    .modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 11px 18px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.18s;
+      border: 1.5px solid transparent;
+      font-family: inherit;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover { background: #5a6fd6; transform: translateY(-1px); }
+
+    .btn-secondary {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text2);
+    }
+
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+    /* ── Page switcher in modal (multi-page illust) ── */
+    .page-switcher {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .page-switcher span { font-size: 0.8rem; color: var(--text2); }
+
+    .page-dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text2);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .page-dot.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .page-dot:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 22px;
+      border-radius: 50px;
+      font-size: 0.88rem;
+      z-index: 3000;
+      opacity: 0;
+      transition: all 0.28s cubic-bezier(.2,.8,.3,1);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+    /* ── Topbar ── */
+    .topbar { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 14px; }
+    .topbar a { color: rgba(255,255,255,.85); text-decoration: none; font-size: 14px; transition: color .2s; }
+    .topbar a:hover { color: #fff; }
+    .topbar h1 { font-size: 18px; font-weight: 600; }
+
+    /* ── Responsive Modal ── */
+    @media (max-width: 700px) {
+      .modal { flex-direction: column; max-height: 96vh; }
+      .modal-left { max-width: 100%; border-radius: 20px 20px 0 0; min-height: 220px; }
+      .modal-right { width: 100%; max-height: 50vh; }
+      .modal-nav.next { right: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ── -->
+<div class="topbar">
+  <a href="../index.html">← 返回首页</a>
+  <h1>🎨 Pixiv 搜图</h1>
+</div>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo-wrap">
+    <div class="logo">
+      <div class="logo-icon">P</div>
+      <span class="logo-text">Pixiv Search</span>
+    </div>
+    <div class="logo-sub">Pixiv Illustration Search</div>
+    <div class="search-wrap">
+      <div class="search-box">
+        <input type="text" id="searchInput"
+          placeholder="输入标签或关键词，支持中英日文..."
+          autocomplete="off" spellcheck="false">
+        <button id="searchBtn">搜索</button>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <span class="filter-label">内容：</span>
+      <button class="filter-btn active" data-mode="all">全部</button>
+      <button class="filter-btn" data-mode="safe">健全</button>
+      <button class="filter-btn" data-mode="r18">R-18</button>
+      <span class="filter-label" style="margin-left:8px">排序：</span>
+      <button class="filter-btn active" data-order="date_d">最新</button>
+      <button class="filter-btn" data-order="popular_d">最热</button>
+      <span class="filter-label" style="margin-left:8px">类型：</span>
+      <button class="filter-btn active" data-type="illust">插画</button>
+      <button class="filter-btn" data-type="manga">漫画</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main ── -->
+<main>
+  <div class="status-bar" id="statusBar"></div>
+  <div id="resultsContainer">
+    <div class="center-state">
+      <div class="icon">🎨</div>
+      <p>搜索 Pixiv 上的插画</p>
+      <small>
+        使用公开 API 代理服务<br>
+        输入关键词或标签开始探索
+      </small>
+    </div>
+  </div>
+  <div id="loadMoreWrap" style="display:none">
+    <div class="load-more-wrap">
+      <button class="load-more-btn" id="loadMoreBtn">加载更多</button>
+    </div>
+  </div>
+</main>
+
+<!-- ── Modal ── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <button class="modal-nav prev" id="modalPrev">‹</button>
+    <button class="modal-nav next" id="modalNext">›</button>
+    <div class="modal-left" id="modalLeft">
+      <div class="img-loading">
+        <div class="big-spin" style="width:36px;height:36px;border:3px solid #e0e0e0;border-top-color:#667eea;border-radius:50%;animation:spin 0.7s linear infinite"></div>
+      </div>
+    </div>
+    <div class="modal-right" id="modalRight"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// 配置
+// ═══════════════════════════════════════════════════════════
+// 多个公开 Pixiv API 代理，按优先级排列，自动故障切换
+const PROXY_APIS = [
+  'https://api.pixivic.com',     // Pixivic API
+  'https://hibiapi.cocomi.eu.org', // HibiAPI 镜像
+  'https://hibiapi.getloli.com', // HibiAPI
+  'https://api.obfs.dev',        // obfs 代理
+  'https://pixiv.cat',           // pixiv.cat
+  // CORS 代理 + Pixiv 直连（最后备用）
+  { cors: 'https://corsproxy.io/?', api: 'https://www.pixiv.net/ajax/search/artworks' },
+  { cors: 'https://api.allorigins.win/raw?url=', api: 'https://www.pixiv.net/ajax/search/artworks' },
+];
+
+// 图片代理：将 i.pximg.net 替换为以下代理域名
+const IMG_PROXIES = [
+  'i.pixiv.re',
+  'i.pixiv.cat',
+  'i.pixiv.nl',
+  'pixiv.nl',
+];
+
+let activeImgProxy = IMG_PROXIES[0];
+let activeApiProxy = PROXY_APIS[0];
+
+// ═══════════════════════════════════════════════════════════
+// 状态
+// ═══════════════════════════════════════════════════════════
+const state = {
+  keyword: '',
+  page: 1,
+  mode: 'all',       // all | safe | r18
+  order: 'date_d',   // date_d | popular_d
+  type: 'illust',    // illust | manga
+  results: [],
+  total: 0,
+  loading: false,
+  currentIdx: 0,     // modal 中当前图片索引
+  currentPage: 0,    // 多图作品当前查看第几页
+};
+
+// ═══════════════════════════════════════════════════════════
+// DOM
+// ═══════════════════════════════════════════════════════════
+const searchInput     = document.getElementById('searchInput');
+const searchBtn       = document.getElementById('searchBtn');
+const resultsContainer= document.getElementById('resultsContainer');
+const statusBar       = document.getElementById('statusBar');
+const loadMoreWrap    = document.getElementById('loadMoreWrap');
+const loadMoreBtn     = document.getElementById('loadMoreBtn');
+const modalOverlay    = document.getElementById('modalOverlay');
+const modalLeft       = document.getElementById('modalLeft');
+const modalRight      = document.getElementById('modalRight');
+const modalClose      = document.getElementById('modalClose');
+const modalPrev       = document.getElementById('modalPrev');
+const modalNext       = document.getElementById('modalNext');
+const toastEl         = document.getElementById('toast');
+
+// ═══════════════════════════════════════════════════════════
+// 搜索
+// ═══════════════════════════════════════════════════════════
+async function doSearch(resetPage = true) {
+  const kw = searchInput.value.trim();
+  if (!kw) return;
+  if (state.loading) return;
+
+  state.keyword = kw;
+  if (resetPage) {
+    state.page = 1;
+    state.results = [];
+  }
+
+  state.loading = true;
+  searchBtn.disabled = true;
+
+  if (resetPage) {
+    resultsContainer.innerHTML = `
+      <div class="main-loader">
+        <div class="big-spin"></div>
+        <span>正在搜索 Pixiv...</span>
+      </div>`;
+    loadMoreWrap.style.display = 'none';
+    statusBar.innerHTML = '';
+  } else {
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = '加载中...';
+  }
+
+  try {
+    const data = await fetchPixiv(kw, state.page);
+    let illusts = data.illusts || [];
+    
+    // 客户端过滤（防止 API 过滤不准确）
+    if (state.mode === 'safe') {
+      illusts = illusts.filter(img => !img.isR18);
+    } else if (state.mode === 'r18') {
+      illusts = illusts.filter(img => img.isR18);
+    }
+    
+    // 客户端排序（作为备用，确保排序正确）
+    if (state.order === 'popular_d') {
+      illusts.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+    } else {
+      // date_d - 按日期降序
+      illusts.sort((a, b) => {
+        const dateA = new Date(a.createDate || 0);
+        const dateB = new Date(b.createDate || 0);
+        return dateB - dateA;
+      });
+    }
+    
+    if (resetPage) {
+      state.results = illusts;
+    } else {
+      state.results = [...state.results, ...illusts];
+    }
+    state.total = data.total || state.results.length;
+    renderResults();
+    updateStatus();
+  } catch (e) {
+    console.error(e);
+    if (resetPage) {
+      // 提取更详细的错误信息
+      const errorDetails = e.message.includes('所有代理均不可用') 
+        ? e.message 
+        : `搜索失败：${e.message}`;
+      
+      resultsContainer.innerHTML = `
+        <div class="center-state">
+          <div class="icon">⚠️</div>
+          <p>搜索失败</p>
+          <small style="max-width:600px;display:block;margin:0 auto;line-height:1.8">
+            ${escHtml(errorDetails)}<br><br>
+            <strong>可能的解决方案：</strong><br>
+            • 检查网络连接是否正常<br>
+            • 稍后重试（API 代理可能暂时不可用）<br>
+            • 尝试使用 VPN 或代理<br>
+            • 尝试搜索其他关键词
+          </small>
+        </div>`;
+    } else {
+      showToast('加载失败：' + e.message);
+    }
+  } finally {
+    state.loading = false;
+    searchBtn.disabled = false;
+    loadMoreBtn.disabled = false;
+    loadMoreBtn.textContent = '加载更多';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Pixiv API（使用公开代理）
+// ═══════════════════════════════════════════════════════════
+async function fetchPixiv(keyword, page) {
+  // 优先使用 api.obfs.dev 的 Pixiv Ajax 代理
+  // 接口与 pixiv.net/ajax/search 兼容
+  const errors = [];
+
+  for (const proxy of PROXY_APIS) {
+    try {
+      const proxyName = typeof proxy === 'string' ? proxy : `${proxy.cors} + Pixiv`;
+      console.log(`尝试代理: ${proxyName}`);
+      const data = await tryFetchWithProxy(proxy, keyword, page);
+      activeApiProxy = typeof proxy === 'string' ? proxy : 'CORS Proxy';
+      console.log(`✓ 成功使用: ${proxyName}`);
+      return data;
+    } catch (e) {
+      const proxyName = typeof proxy === 'string' ? proxy : 'CORS Proxy';
+      errors.push(`[${proxyName}] ${e.message}`);
+      console.warn(`✗ ${proxyName} 失败:`, e.message);
+    }
+  }
+
+  throw new Error('所有代理均不可用：' + errors.join(' | '));
+}
+
+async function tryFetchWithProxy(proxy, keyword, page) {
+  // 处理 CORS 代理对象
+  if (typeof proxy === 'object' && proxy.cors && proxy.api) {
+    const params = new URLSearchParams({
+      word: keyword,
+      order: state.order,
+      mode: state.mode === 'all' ? 'all' : (state.mode === 'safe' ? 'safe' : 'r18'),
+      p: page,
+      s_mode: 's_tag',
+      type: state.type,
+      lang: 'zh',
+    });
+    const pixivUrl = `${proxy.api}/${encodeURIComponent(keyword)}?${params}`;
+    const url = proxy.cors + encodeURIComponent(pixivUrl);
+    console.log('请求 URL (CORS):', url);
+    const resp = await fetchWithTimeout(url, 20000);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    return parseApiResponse('pixiv-direct', json);
+  }
+
+  // 普通代理
+  const url = buildApiUrl(proxy, keyword, page);
+  console.log('请求 URL:', url);
+  console.log('当前筛选 - mode:', state.mode, 'order:', state.order, 'type:', state.type);
+  const resp = await fetchWithTimeout(url, 15000);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const json = await resp.json();
+  return parseApiResponse(proxy, json);
+}
+
+function buildApiUrl(proxy, keyword, page) {
+  const encoded = encodeURIComponent(keyword);
+  
+  if (proxy.includes('pixivic')) {
+    // Pixivic API 格式
+    const pixivicParams = new URLSearchParams({
+      keyword: keyword,
+      page: page - 1,
+      pageSize: 30,
+      searchType: 'original',
+    });
+    // Pixivic 排序：popDesc (热度), dateDesc (最新)
+    if (state.order === 'popular_d') {
+      pixivicParams.set('orderBy', 'popDesc');
+    } else {
+      pixivicParams.set('orderBy', 'dateDesc');
+    }
+    return `${proxy}/illusts?${pixivicParams}`;
+  }
+  
+  if (proxy.includes('hibiapi')) {
+    // HibiAPI 格式
+    const params = new URLSearchParams({
+      word: keyword,
+      search_target: 'partial_match_for_tags',
+      offset: (page - 1) * 30,
+    });
+    // HibiAPI 排序：date_desc (最新), popular_desc (热度)
+    if (state.order === 'popular_d') {
+      params.set('sort', 'popular_desc');
+    } else {
+      params.set('sort', 'date_desc');
+    }
+    // HibiAPI 的 filter 参数
+    if (state.mode === 'safe') {
+      params.set('filter', 'for_ios');
+    } else if (state.mode === 'r18') {
+      params.set('filter', 'for_android');
+    } else {
+      params.set('filter', 'for_android');
+    }
+    return `${proxy}/api/pixiv/search?${params}`;
+  }
+  
+  if (proxy.includes('obfs.dev')) {
+    // api.obfs.dev 支持代理 pixiv ajax 接口
+    const params = new URLSearchParams({
+      word: keyword,
+      order: state.order, // date_d 或 popular_d
+      mode: state.mode === 'all' ? 'all' : (state.mode === 'safe' ? 'safe' : 'r18'),
+      p: page,
+      s_mode: 's_tag',
+      type: state.type,
+      lang: 'zh',
+    });
+    return `${proxy}/pixiv/illust/search?${params}`;
+  }
+  
+  if (proxy.includes('pixiv.cat')) {
+    const params = new URLSearchParams({
+      word: keyword,
+      order: state.order, // date_d 或 popular_d
+      mode: state.mode === 'all' ? 'all' : (state.mode === 'safe' ? 'safe' : 'r18'),
+      p: page,
+      s_mode: 's_tag',
+      type: state.type,
+      lang: 'zh',
+    });
+    return `${proxy}/illust/search?${params}`;
+  }
+  
+  // 默认格式（Pixiv 官方格式）
+  const params = new URLSearchParams({
+    word: keyword,
+    order: state.order, // date_d 或 popular_d
+    mode: state.mode === 'all' ? 'all' : (state.mode === 'safe' ? 'safe' : 'r18'),
+    p: page,
+    s_mode: 's_tag',
+    type: state.type,
+    lang: 'zh',
+  });
+  return `${proxy}/illust/search?${params}`;
+}
+
+function parseApiResponse(proxy, json) {
+  // 统一解析不同代理返回格式
+  const proxyStr = typeof proxy === 'string' ? proxy : 'cors-proxy';
+  
+  // Pixiv 直连格式: { error: false, body: { illustManga: { data: [...], total: N } } }
+  if (proxyStr === 'pixiv-direct' && json.body?.illustManga) {
+    const illustManga = json.body.illustManga;
+    return {
+      illusts: (illustManga.data || []).map(normalizePixivItem),
+      total: illustManga.total || 0,
+      nextPage: null,
+    };
+  }
+
+  // Pixivic API 格式: { data: [...], total: N }
+  if (proxyStr.includes('pixivic') && json.data) {
+    return {
+      illusts: (json.data || []).map(normalizePixivItem),
+      total: json.total || 0,
+      nextPage: null,
+    };
+  }
+
+  // HibiAPI 格式: { illusts: [...] }
+  if (proxyStr.includes('hibiapi') && json.illusts) {
+    return {
+      illusts: (json.illusts || []).map(normalizePixivItem),
+      total: json.total || json.illusts.length,
+      nextPage: json.next_url || null,
+    };
+  }
+
+  // pixiv ajax 格式: { error: false, body: { illust: { data: [...], total: N } } }
+  if (json.body?.illust) {
+    const illust = json.body.illust;
+    return {
+      illusts: (illust.data || []).map(normalizePixivItem),
+      total: illust.total || 0,
+      nextPage: null,
+    };
+  }
+
+  // 部分代理直接返回数组
+  if (Array.isArray(json)) {
+    return { illusts: json.map(normalizePixivItem), total: json.length, nextPage: null };
+  }
+
+  // 部分代理返回 { illusts: [...] }
+  if (json.illusts) {
+    return {
+      illusts: json.illusts.map(normalizePixivItem),
+      total: json.total || json.illusts.length,
+      nextPage: json.next_url || null,
+    };
+  }
+
+  throw new Error('未知响应格式');
+}
+
+function normalizePixivItem(item) {
+  // 统一插画数据结构
+  const id = item.id || item.illustId;
+  const createDate = item.createDate || item.create_date || '';
+
+  // 构建缩略图 URL（通过图片代理访问 pximg.net）
+  let thumbUrl = item.url || item.image_urls?.square_medium || item.imageUrls?.squareMedium || '';
+  let previewUrl = item.url || item.image_urls?.medium || item.imageUrls?.medium || thumbUrl;
+  let largeUrl   = item.image_urls?.large || item.imageUrls?.large || previewUrl;
+
+  // 多图作品的图片列表
+  let pages = item.meta_pages || item.metaPages || [];
+  let singlePage = item.meta_single_page || item.metaSinglePage || {};
+
+  // 替换图片域名以绕过防盗链
+  thumbUrl   = proxyImgUrl(thumbUrl);
+  previewUrl = proxyImgUrl(previewUrl);
+  largeUrl   = proxyImgUrl(largeUrl);
+
+  return {
+    id: String(id),
+    title: item.title || '无标题',
+    authorName: item.userName || item.user?.name || '未知',
+    authorId: item.userId || item.user?.id || '',
+    thumb: thumbUrl,
+    preview: previewUrl,
+    large: largeUrl,
+    pageCount: item.pageCount || item.page_count || 1,
+    pages: pages.map(p => ({
+      thumb:   proxyImgUrl(p.image_urls?.square_medium || p.imageUrls?.squareMedium || ''),
+      medium:  proxyImgUrl(p.image_urls?.medium || p.imageUrls?.medium || ''),
+      large:   proxyImgUrl(p.image_urls?.large || p.imageUrls?.large || ''),
+      original:proxyImgUrl(p.image_urls?.original || p.imageUrls?.original || ''),
+    })),
+    originalUrl: proxyImgUrl(singlePage.original_image_url || singlePage.originalImageUrl || largeUrl),
+    tags: (item.tags || []).map(t => t.name || t.tag || String(t)).filter(Boolean),
+    likeCount: item.likeCount || item.total_bookmarks || 0,
+    viewCount: item.viewCount || item.total_view || 0,
+    bookmarkCount: item.bookmarkCount || item.total_bookmarks || 0,
+    width: item.width || 0,
+    height: item.height || 0,
+    isR18: (item.xRestrict || item.x_restrict) > 0,
+    pageUrl: `https://www.pixiv.net/artworks/${id}`,
+    createDate,
+  };
+}
+
+function proxyImgUrl(url) {
+  if (!url) return '';
+  // 将 i.pximg.net / i-cf.pximg.net 替换为代理域名
+  return url
+    .replace(/i(-cf)?\.pximg\.net/g, activeImgProxy)
+    .replace(/^http:/, 'https:');
+}
+
+function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
+// ═══════════════════════════════════════════════════════════
+// 渲染
+// ═══════════════════════════════════════════════════════════
+function renderResults() {
+  const imgs = state.results;
+  if (!imgs.length) {
+    resultsContainer.innerHTML = `
+      <div class="center-state">
+        <div class="icon">😔</div>
+        <p>未找到相关插画</p>
+        <small>换个关键词试试，或尝试日文标签效果更好</small>
+      </div>`;
+    loadMoreWrap.style.display = 'none';
+    return;
+  }
+
+  resultsContainer.innerHTML = `<div class="masonry-grid" id="grid">${imgs.map((img, i) => renderCard(img, i)).join('')}</div>`;
+  loadMoreWrap.style.display = 'block';
+
+  // 绑定点击
+  document.querySelectorAll('.image-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const idx = parseInt(card.dataset.idx);
+      openModal(idx);
+    });
+  });
+
+  // 图片懒加载
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        const src = img.dataset.src;
+        if (src) {
+          img.src = src;
+          img.removeAttribute('data-src');
+        }
+        observer.unobserve(img);
+      }
+    });
+  }, { rootMargin: '200px' });
+
+  document.querySelectorAll('.card-img[data-src]').forEach(img => observer.observe(img));
+}
+
+function renderCard(img, idx) {
+  const ratio = img.width && img.height ? img.height / img.width : 1.4;
+  const paddingBottom = Math.min(Math.max(ratio * 100, 60), 180);
+
+  return `
+    <div class="image-card" data-idx="${idx}">
+      <div class="card-img-wrap" style="padding-bottom:${paddingBottom}%">
+        <div class="card-loading"><div class="spin"></div></div>
+        <img class="card-img"
+          data-src="${escHtml(img.thumb)}"
+          alt="${escHtml(img.title)}"
+          style="position:absolute;top:0;left:0;height:100%;object-fit:cover"
+          onload="this.classList.add('loaded');this.previousElementSibling.style.display='none'"
+          onerror="this.previousElementSibling.style.display='none';this.classList.add('loaded')">
+      </div>
+      ${img.isR18 ? '<span class="badge-r18">R-18</span>' : ''}
+      ${img.pageCount > 1 ? `<span class="badge-multi">🖼 ${img.pageCount}</span>` : ''}
+      <div class="card-overlay">
+        <div class="card-title">${escHtml(img.title)}</div>
+        <div class="card-meta">
+          <span>${escHtml(img.authorName)}</span>
+          ${img.likeCount ? `<span>♥ ${fmtNum(img.likeCount)}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Modal
+// ═══════════════════════════════════════════════════════════
+function openModal(idx) {
+  state.currentIdx = idx;
+  state.currentPage = 0;
+  modalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  renderModal();
+}
+
+function renderModal() {
+  const img = state.results[state.currentIdx];
+  if (!img) return;
+
+  // 左侧图片
+  const displayUrl = getModalImgUrl(img, state.currentPage);
+  modalLeft.innerHTML = `
+    <img src="${escHtml(displayUrl)}" alt="${escHtml(img.title)}"
+      onerror="this.src='';this.alt='图片加载失败'"
+      style="animation:fadeIn 0.25s ease">`;
+
+  // 右侧信息
+  const tagsHtml = img.tags.slice(0, 24).map(t =>
+    `<span class="tag" onclick="searchTag('${escHtml(t)}')">#${escHtml(t)}</span>`
+  ).join('');
+
+  // 多图切换
+  let pageSwitcher = '';
+  if (img.pageCount > 1) {
+    const dots = Array.from({length: Math.min(img.pageCount, 12)}, (_, i) =>
+      `<button class="page-dot ${i === state.currentPage ? 'active' : ''}" onclick="switchPage(${i})">${i+1}</button>`
+    ).join('');
+    pageSwitcher = `
+      <div class="page-switcher">
+        <span>第 ${state.currentPage + 1} / ${img.pageCount} 页</span>
+        ${dots}
+        ${img.pageCount > 12 ? `<span>…共${img.pageCount}页</span>` : ''}
+      </div>`;
+  }
+
+  const dimStr = img.width && img.height ? `${img.width}×${img.height}` : '';
+  const dateStr = img.createDate ? img.createDate.substring(0, 10) : '';
+
+  modalRight.innerHTML = `
+    <div class="modal-platform">
+      <span>P</span> Pixiv
+    </div>
+    <div class="modal-title">${escHtml(img.title)}</div>
+    <div class="modal-author">
+      👤
+      <a href="https://www.pixiv.net/users/${img.authorId}" target="_blank" rel="noopener">
+        ${escHtml(img.authorName)}
+      </a>
+      ${dimStr ? `<span style="color:var(--text3)">|</span><span>${dimStr}</span>` : ''}
+    </div>
+    <div class="modal-stats">
+      ${img.viewCount  ? `<div class="stat">👁 ${fmtNum(img.viewCount)}</div>` : ''}
+      ${img.likeCount  ? `<div class="stat">♥ ${fmtNum(img.likeCount)}</div>` : ''}
+      ${img.pageCount > 1 ? `<div class="stat">🖼 ${img.pageCount}P</div>` : ''}
+      ${dateStr ? `<div class="stat">📅 ${dateStr}</div>` : ''}
+    </div>
+    ${pageSwitcher}
+    ${tagsHtml ? `<div class="modal-tags">${tagsHtml}</div>` : ''}
+    <div class="modal-actions">
+      <a class="btn btn-primary" href="${escHtml(img.pageUrl)}" target="_blank" rel="noopener">
+        🔗 在 Pixiv 查看原作
+      </a>
+      <button class="btn btn-secondary" onclick="copyLink('${escHtml(img.pageUrl)}')">
+        📋 复制链接
+      </button>
+    </div>`;
+
+  // 更新导航按钮
+  modalPrev.disabled = state.currentIdx === 0;
+  modalNext.disabled = state.currentIdx >= state.results.length - 1;
+}
+
+function getModalImgUrl(img, pageIdx) {
+  if (img.pages && img.pages.length > 0) {
+    return img.pages[pageIdx]?.large || img.pages[pageIdx]?.medium || img.large;
+  }
+  return img.large || img.preview;
+}
+
+window.switchPage = function(pageIdx) {
+  state.currentPage = pageIdx;
+  renderModal();
+};
+
+function closeModal() {
+  modalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+modalClose.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+modalPrev.addEventListener('click', () => {
+  if (state.currentIdx > 0) {
+    state.currentIdx--;
+    state.currentPage = 0;
+    renderModal();
+  }
+});
+
+modalNext.addEventListener('click', () => {
+  if (state.currentIdx < state.results.length - 1) {
+    state.currentIdx++;
+    state.currentPage = 0;
+    renderModal();
+    // 快要到底时预加载更多
+    if (state.currentIdx >= state.results.length - 5) {
+      loadMore(true);
+    }
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (!modalOverlay.classList.contains('open')) return;
+  if (e.key === 'Escape')      closeModal();
+  if (e.key === 'ArrowLeft')   modalPrev.click();
+  if (e.key === 'ArrowRight')  modalNext.click();
+});
+
+// ═══════════════════════════════════════════════════════════
+// Load More
+// ═══════════════════════════════════════════════════════════
+async function loadMore(silent = false) {
+  if (state.loading) return;
+  state.page++;
+  await doSearch(false);
+}
+
+loadMoreBtn.addEventListener('click', () => loadMore(false));
+
+// ═══════════════════════════════════════════════════════════
+// 筛选器
+// ═══════════════════════════════════════════════════════════
+document.querySelectorAll('.filter-btn[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn[data-mode]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.mode = btn.dataset.mode;
+    if (state.keyword) doSearch(true);
+  });
+});
+
+document.querySelectorAll('.filter-btn[data-order]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn[data-order]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.order = btn.dataset.order;
+    if (state.keyword) doSearch(true);
+  });
+});
+
+document.querySelectorAll('.filter-btn[data-type]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn[data-type]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.type = btn.dataset.type;
+    if (state.keyword) doSearch(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// 状态栏
+// ═══════════════════════════════════════════════════════════
+function updateStatus() {
+  const n = state.results.length;
+  const t = state.total;
+  const proxyDisplay = typeof activeApiProxy === 'string' 
+    ? activeApiProxy.replace('https://', '') 
+    : 'CORS Proxy';
+  statusBar.innerHTML = `<span class="status-text">
+    "<strong>${escHtml(state.keyword)}</strong>" — 已显示 <strong>${n}</strong> 张
+    ${t > n ? `/ 共约 <strong>${fmtNum(t)}</strong> 张` : ''}
+    &nbsp;<span style="color:var(--text3);font-size:0.78rem">via ${proxyDisplay}</span>
+  </span>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 工具函数
+// ═══════════════════════════════════════════════════════════
+window.searchTag = function(tag) {
+  closeModal();
+  searchInput.value = tag;
+  doSearch(true);
+};
+
+window.copyLink = function(url) {
+  navigator.clipboard.writeText(url).then(() => showToast('✓ 链接已复制'));
+};
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toastEl.classList.remove('show'), 2400);
+}
+
+function fmtNum(n) {
+  n = Number(n) || 0;
+  if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
+  if (n >= 1000)  return (n / 1000).toFixed(1) + 'k';
+  return String(n);
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// ═══════════════════════════════════════════════════════════
+// 事件绑定
+// ═══════════════════════════════════════════════════════════
+searchBtn.addEventListener('click', () => doSearch(true));
+searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(true); });
+
+// 自动聚焦
+searchInput.focus();
+</script>
+</body>
+</html>

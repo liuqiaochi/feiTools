@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lora 提示词生成 - 老肥工具箱</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.topbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px}
+.topbar a{color:rgba(255,255,255,.85);text-decoration:none;font-size:14px;transition:color .2s}
+.topbar a:hover{color:#fff}
+.topbar h1{font-size:18px;font-weight:600}
+.container{max-width:960px;margin:28px auto;padding:0 16px 60px}
+.panel{background:#fff;border-radius:12px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:20px}
+.panel-title{font-size:15px;font-weight:600;margin-bottom:14px;color:#444;display:flex;align-items:center;gap:8px}
+label{display:block;font-size:14px;color:#666;margin-bottom:6px}
+textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical;min-height:60px;transition:border .2s}
+textarea:focus{outline:none;border-color:#667eea}
+.btn{display:inline-block;padding:9px 22px;border:none;border-radius:6px;background:#667eea;color:#fff;font-size:14px;cursor:pointer;transition:background .2s;margin-right:8px;margin-top:8px}
+.btn:hover{background:#5a6fd6}
+.btn-sm{padding:5px 14px;font-size:12px;margin:0}
+.btn-outline{background:transparent;color:#667eea;border:1px solid #667eea}
+.btn-outline:hover{background:#f0f1ff}
+.tag-group{margin-bottom:18px}
+.tag-group-label{font-size:13px;color:#999;margin-bottom:8px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{padding:5px 14px;border-radius:50px;border:1px solid #e0e0e0;background:#fff;color:#555;font-size:12px;cursor:pointer;transition:all .15s;user-select:none}
+.tag:hover{border-color:#667eea;color:#667eea}
+.tag.selected{background:#667eea;color:#fff;border-color:#667eea}
+.tag .weight{font-size:10px;opacity:.7;margin-left:2px}
+.output-box{background:#1e1e2e;border-radius:8px;padding:16px;font-family:"SF Mono","Fira Code",monospace;font-size:13px;color:#cdd6f4;white-space:pre-wrap;word-break:break-all;line-height:1.7;min-height:60px;position:relative;margin-top:10px}
+.output-label{font-size:12px;color:#89b4fa;margin-bottom:4px;font-weight:600}
+.output-neg{color:#f38ba8}
+.copy-btn{position:absolute;top:10px;right:10px;padding:4px 12px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#cdd6f4;font-size:11px;cursor:pointer;transition:all .15s}
+.copy-btn:hover{background:rgba(255,255,255,.14)}
+.weight-ctrl{display:inline-flex;align-items:center;gap:2px;margin-left:4px}
+.weight-ctrl button{width:18px;height:18px;border-radius:3px;border:1px solid #d9d9d9;background:#fff;cursor:pointer;font-size:11px;line-height:1;color:#666;display:flex;align-items:center;justify-content:center;padding:0}
+.weight-ctrl button:hover{border-color:#667eea;color:#667eea}
+.hint{font-size:12px;color:#aaa;margin-top:6px}
+hr{border:none;border-top:1px solid #eee;margin:18px 0}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="../index.html">← 返回首页</a>
+  <h1>✨ Lora 提示词生成</h1>
+</div>
+<div class="container">
+
+<div class="panel">
+  <div class="panel-title">📝 输入关键词</div>
+  <label>支持中文自然语言描述，自动拆解翻译为英文 Stable Diffusion 标签</label>
+  <textarea id="userInput" rows="4" placeholder="例如：油亮黑丝过膝长袜，袜口有红色蕾丝，搭配吊袜带，酒红色漆皮高跟鞋，以托腮姿势坐在吧台高脚凳上，双腿交叉"></textarea>
+  <div class="hint">可以直接写中文长句描述，生成时会自动拆解为英文提示词标签；也支持逗号分隔的关键词</div>
+</div>
+
+<div class="panel" id="tagPanel"></div>
+
+<div class="panel">
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" onclick="generate()">🚀 生成提示词</button>
+    <button class="btn btn-outline" onclick="randomFill()">🎲 随机灵感</button>
+    <button class="btn btn-outline" onclick="clearAll()">🗑 清空</button>
+  </div>
+  <div id="output" style="margin-top:18px"></div>
+</div>
+
+</div>
+
+<script>
+// ═══ 标签库 ═══
+const TAG_DB = {
+  '画风/质量': [
+    'masterpiece','best quality','ultra-detailed','8k','highres',
+    'absurdres','incredibly absurdres','huge filesize',
+    'wallpaper','illustration','anime style','realistic',
+    'oil painting','watercolor','sketch','pixel art','3d render'
+  ],
+  '人物特征': [
+    '1girl','1boy','solo','multiple girls','couple',
+    'long hair','short hair','twintails','ponytail','braids','white hair','black hair','blonde hair','blue hair','pink hair','silver hair','red hair',
+    'blue eyes','red eyes','green eyes','heterochromia',
+    'cat ears','fox ears','horns','wings','tail','elf ears',
+    'smile','blush','crying','expressionless','open mouth','closed eyes'
+  ],
+  '服装/装饰': [
+    'school uniform','dress','kimono','maid outfit','armor','hoodie','swimsuit','chinese clothes','gothic lolita','military uniform',
+    'ribbon','choker','glasses','hat','crown','earrings','necklace','thighhighs','boots','barefoot'
+  ],
+  '姿势/动作': [
+    'standing','sitting','lying','walking','running','jumping',
+    'arms up','hand on hip','looking at viewer','looking away','from behind','from above','from below',
+    'portrait','upper body','full body','cowboy shot','close-up'
+  ],
+  '场景/背景': [
+    'outdoors','indoors','simple background','white background','gradient background',
+    'sky','clouds','sunset','sunrise','night sky','starry sky','rain',
+    'ocean','beach','forest','mountain','city','street','classroom','bedroom','garden','castle','ruins','space','underwater'
+  ],
+  '光影/氛围': [
+    'dramatic lighting','soft lighting','backlighting','rim lighting','cinematic lighting',
+    'sunlight','moonlight','neon lights','volumetric lighting',
+    'depth of field','bokeh','lens flare','bloom','chromatic aberration',
+    'dark theme','bright','warm colors','cool colors','pastel colors'
+  ]
+};
+
+const NEGATIVE_PRESETS = {
+  '通用高质量': 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry',
+  '真人写实': 'cartoon, anime, illustration, painting, drawing, sketch, 3d, render, lowres, bad anatomy, bad hands, text, error, worst quality, low quality, jpeg artifacts, watermark, blurry, deformed',
+  '动漫插画': 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts, signature, watermark, username, blurry, bad feet, poorly drawn hands, poorly drawn face, mutation, deformed, extra fingers, extra limbs, extra arms, extra legs, malformed limbs',
+  '简洁': 'lowres, worst quality, low quality, blurry, bad anatomy, watermark, text'
+};
+
+// ═══ 中文短语 → SD 标签映射（支持长短语匹配）═══
+const PHRASE_MAP = [
+  // ── 袜子/腿部 ──
+  ['黑丝', 'black pantyhose'],['白丝', 'white pantyhose'],['肉丝', 'nude pantyhose'],
+  ['过膝袜', 'thighhighs'],['过膝长袜', 'thighhighs'],['长筒袜', 'thighhighs'],
+  ['丝袜', 'stockings'],['网袜', 'fishnet stockings'],['条纹袜', 'striped thighhighs'],
+  ['吊袜带', 'garter straps'],['袜带', 'garter belt'],['油亮', 'glossy'],['光泽', 'shiny'],
+  // ── 鞋子 ──
+  ['高跟鞋', 'high heels'],['细高跟', 'stiletto heels'],['厚底鞋', 'platform shoes'],
+  ['漆皮', 'patent leather'],['皮鞋', 'leather shoes'],['靴子', 'boots'],['长靴', 'knee boots'],
+  ['凉鞋', 'sandals'],['拖鞋', 'slippers'],['运动鞋', 'sneakers'],['马丁靴', 'combat boots'],
+  ['酒红色', 'wine red'],['镶钻', 'jeweled'],['鞋头', 'toe cap'],['绑带', 'ankle strap'],['脚踝', 'ankle'],
+  // ── 蕾丝/装饰 ──
+  ['蕾丝', 'lace'],['蕾丝边', 'lace trim'],['蕾丝花边', 'lace trim'],
+  ['宝石', 'gemstone'],['水晶', 'crystal'],['珍珠', 'pearl'],['钻石', 'diamond'],
+  ['刺绣', 'embroidery'],['流苏', 'tassel'],['蝴蝶结', 'bow'],['缎带', 'satin ribbon'],
+  ['袜口', 'stocking top'],['红色蕾丝', 'red lace trim'],
+  // ── 姿势 ──
+  ['托腮', 'chin rest, hand on own chin'],['叉腰', 'hand on hip'],['抱膝', 'hugging own legs'],
+  ['双腿交叉', 'crossed legs'],['翘二郎腿', 'crossed legs'],['盘腿', 'indian style'],
+  ['坐在', 'sitting on'],['站在', 'standing on'],['躺在', 'lying on'],['靠在', 'leaning on'],
+  ['蹲着', 'squatting'],['跪着', 'kneeling'],['趴着', 'lying on stomach'],
+  ['回头看', 'looking back'],['低头', 'looking down'],['抬头', 'looking up'],
+  ['侧身', 'from side'],['背对', 'from behind'],['面对镜头', 'looking at viewer'],
+  ['双手抱胸', 'arms crossed'],['单手撑头', 'head rest'],['伸懒腰', 'stretching'],
+  ['撩头发', 'hair flip'],['捂嘴', 'hand over mouth'],['比心', 'heart hands'],
+  ['举手', 'arms up'],['张开双臂', 'spread arms'],['手放背后', 'arms behind back'],
+  // ── 家具/场景 ──
+  ['吧台', 'bar counter'],['高脚凳', 'bar stool'],['沙发', 'sofa'],['床', 'bed'],
+  ['椅子', 'chair'],['桌子', 'table'],['窗边', 'by the window'],['镜子前', 'in front of mirror'],
+  ['浴缸', 'bathtub'],['秋千', 'swing'],['楼梯', 'stairs'],['走廊', 'hallway'],
+  // ── 颜色 ──
+  ['红色', 'red'],['蓝色', 'blue'],['绿色', 'green'],['黄色', 'yellow'],['紫色', 'purple'],
+  ['粉色', 'pink'],['白色', 'white'],['黑色', 'black'],['金色', 'gold'],['银色', 'silver'],
+  ['橙色', 'orange'],['棕色', 'brown'],['灰色', 'gray'],['酒红', 'wine red'],['深红', 'dark red'],
+  ['浅蓝', 'light blue'],['深蓝', 'dark blue'],['米色', 'beige'],['藏青', 'navy blue'],
+  // ── 材质 ──
+  ['皮革', 'leather'],['丝绸', 'silk'],['缎面', 'satin'],['天鹅绒', 'velvet'],
+  ['雪纺', 'chiffon'],['棉质', 'cotton'],['牛仔', 'denim'],['毛绒', 'fluffy'],['透明', 'transparent'],['半透明', 'translucent'],
+  // ── 服装 ──
+  ['旗袍', 'china dress'],['和服', 'kimono'],['女仆装', 'maid outfit'],['校服', 'school uniform'],
+  ['西装', 'suit'],['礼服', 'evening dress'],['婚纱', 'wedding dress'],['泳装', 'swimsuit'],
+  ['比基尼', 'bikini'],['内衣', 'lingerie'],['睡衣', 'pajamas'],['浴袍', 'bathrobe'],
+  ['连衣裙', 'dress'],['短裙', 'miniskirt'],['长裙', 'long skirt'],['百褶裙', 'pleated skirt'],
+  ['热裤', 'short shorts'],['紧身衣', 'bodysuit'],['吊带', 'camisole'],['抹胸', 'tube top'],
+  ['露肩', 'off shoulder'],['露背', 'backless'],['开叉', 'side slit'],['低胸', 'cleavage'],
+  ['围裙', 'apron'],['斗篷', 'cape'],['披风', 'cloak'],['卫衣', 'hoodie'],
+  // ── 配饰 ──
+  ['项链', 'necklace'],['耳环', 'earrings'],['手镯', 'bracelet'],['戒指', 'ring'],
+  ['发带', 'hair ribbon'],['发卡', 'hair clip'],['头饰', 'hair ornament'],['皇冠', 'tiara'],
+  ['眼镜', 'glasses'],['墨镜', 'sunglasses'],['面纱', 'veil'],['口罩', 'mask'],
+  ['项圈', 'choker'],['领带', 'necktie'],['领结', 'bowtie'],['围巾', 'scarf'],
+  // ── 发型 ──
+  ['长发', 'long hair'],['短发', 'short hair'],['双马尾', 'twintails'],['马尾', 'ponytail'],
+  ['丸子头', 'hair bun'],['编发', 'braid'],['卷发', 'curly hair'],['直发', 'straight hair'],
+  ['刘海', 'bangs'],['侧分', 'side-swept bangs'],['齐刘海', 'blunt bangs'],['公主切', 'hime cut'],
+  ['白发', 'white hair'],['黑发', 'black hair'],['金发', 'blonde hair'],['银发', 'silver hair'],
+  ['蓝发', 'blue hair'],['粉发', 'pink hair'],['红发', 'red hair'],['紫发', 'purple hair'],
+  // ── 表情 ──
+  ['微笑', 'smile'],['大笑', 'laughing'],['害羞', 'shy'],['脸红', 'blush'],
+  ['哭泣', 'crying'],['生气', 'angry'],['惊讶', 'surprised'],['无表情', 'expressionless'],
+  ['闭眼', 'closed eyes'],['眯眼', 'half-closed eyes'],['媚眼', 'seductive smile'],
+  // ── 身体特征 ──
+  ['猫耳', 'cat ears'],['猫娘', 'cat ears, cat tail'],['狐耳', 'fox ears'],['兔耳', 'rabbit ears'],
+  ['翅膀', 'wings'],['尾巴', 'tail'],['角', 'horns'],['精灵耳', 'elf ears'],['光环', 'halo'],
+  // ── 画风/质量 ──
+  ['杰作', 'masterpiece'],['精细', 'ultra-detailed'],['高清', 'highres'],['写实', 'realistic'],
+  ['动漫风', 'anime style'],['油画', 'oil painting'],['水彩', 'watercolor'],['插画', 'illustration'],
+  // ── 光影 ──
+  ['逆光', 'backlighting'],['柔光', 'soft lighting'],['阳光', 'sunlight'],['月光', 'moonlight'],
+  ['霓虹', 'neon lights'],['烛光', 'candlelight'],['暖光', 'warm lighting'],
+  // ── 场景 ──
+  ['户外', 'outdoors'],['室内', 'indoors'],['夕阳', 'sunset'],['夜晚', 'night'],
+  ['海边', 'beach'],['森林', 'forest'],['城市', 'city'],['花园', 'garden'],
+  ['教室', 'classroom'],['卧室', 'bedroom'],['浴室', 'bathroom'],['厨房', 'kitchen'],
+  ['酒吧', 'bar'],['咖啡厅', 'cafe'],['图书馆', 'library'],['天台', 'rooftop'],
+  // ── 氛围 ──
+  ['唯美', 'beautiful'],['梦幻', 'dreamy'],['性感', 'sexy'],['可爱', 'cute'],
+  ['优雅', 'elegant'],['高贵', 'noble'],['冷艳', 'cool beauty'],['妩媚', 'alluring'],
+  ['清纯', 'innocent'],['帅气', 'handsome'],['英俊', 'handsome'],
+];
+
+// 按短语长度降序排列，优先匹配长短语
+PHRASE_MAP.sort((a, b) => b[0].length - a[0].length);
+
+// ═══ 状态 ═══
+const selected = {}; // { tagName: weight }
+
+function initTags() {
+  const panel = document.getElementById('tagPanel');
+  let html = '<div class="panel-title">🏷 选择标签（点击添加，可调权重）</div>';
+  for (const [group, tags] of Object.entries(TAG_DB)) {
+    html += `<div class="tag-group"><div class="tag-group-label">${group}</div><div class="tags">`;
+    for (const t of tags) {
+      html += `<span class="tag" data-tag="${t}" onclick="toggleTag(this,'${t}')">${t}</span>`;
+    }
+    html += '</div></div>';
+  }
+  html += '<hr><div class="tag-group"><div class="tag-group-label">反向提示词预设</div><div class="tags">';
+  for (const name of Object.keys(NEGATIVE_PRESETS)) {
+    html += `<span class="tag" data-neg="${name}" onclick="selectNeg(this,'${esc(name)}')">${name}</span>`;
+  }
+  html += '</div></div>';
+  panel.innerHTML = html;
+}
+
+let selectedNeg = '通用高质量';
+
+function toggleTag(el, tag) {
+  if (selected[tag] !== undefined) {
+    delete selected[tag];
+    el.classList.remove('selected');
+    el.innerHTML = tag;
+  } else {
+    selected[tag] = 1.0;
+    el.classList.add('selected');
+    updateTagEl(el, tag);
+  }
+}
+
+function updateTagEl(el, tag) {
+  const w = selected[tag];
+  const wStr = w !== 1.0 ? `:${w.toFixed(1)}` : '';
+  el.innerHTML = `${tag}<span class="weight">${wStr}</span>` +
+    `<span class="weight-ctrl" onclick="event.stopPropagation()">` +
+    `<button onclick="adjWeight('${tag}',this,-0.1)">−</button>` +
+    `<button onclick="adjWeight('${tag}',this,0.1)">+</button></span>`;
+}
+
+function adjWeight(tag, btn, delta) {
+  if (selected[tag] === undefined) return;
+  selected[tag] = Math.round((selected[tag] + delta) * 10) / 10;
+  if (selected[tag] < 0.1) selected[tag] = 0.1;
+  if (selected[tag] > 2.0) selected[tag] = 2.0;
+  const el = document.querySelector(`.tag[data-tag="${tag}"]`);
+  if (el) updateTagEl(el, tag);
+}
+
+function selectNeg(el, name) {
+  document.querySelectorAll('.tag[data-neg]').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedNeg = name;
+}
+
+function formatTag(tag, weight) {
+  if (weight === 1.0) return tag;
+  return `(${tag}:${weight.toFixed(1)})`;
+}
+
+// ═══ 智能中文拆解 ═══
+function hasChinese(str) {
+  return /[\u4e00-\u9fff]/.test(str);
+}
+
+// 从文本中提取已知短语，返回 { matched: [...], remainder: '...' }
+function extractPhrases(text) {
+  const matched = [];
+  let remaining = text;
+  for (const [zh, en] of PHRASE_MAP) {
+    if (remaining.includes(zh)) {
+      matched.push({ zh, en });
+      remaining = remaining.split(zh).join(' ');
+    }
+  }
+  // 清理剩余文本中的标点和空白
+  remaining = remaining.replace(/[，。、；：！？+\s]+/g, ' ').trim();
+  return { matched, remainder: remaining };
+}
+
+// 使用 MyMemory 免费翻译 API 翻译剩余中文
+async function translateRemaining(text) {
+  if (!text || !hasChinese(text)) return text;
+  try {
+    const url = 'https://api.mymemory.translated.net/get?q=' +
+      encodeURIComponent(text) + '&langpair=zh-CN|en';
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const json = await resp.json();
+    if (json.responseStatus === 200 && json.responseData?.translatedText) {
+      return json.responseData.translatedText.toLowerCase();
+    }
+  } catch (e) {
+    console.warn('翻译 API 失败:', e);
+  }
+  return text; // 失败则保留原文
+}
+
+// 将翻译结果整理为 SD 标签格式
+function toSDTags(text) {
+  return text
+    .replace(/[.!?;:()（）【】\[\]{}'"'""\s]+/g, ', ')
+    .replace(/(, )+/g, ', ')
+    .replace(/^[, ]+|[, ]+$/g, '')
+    .toLowerCase();
+}
+
+async function smartTranslate(input) {
+  // 先按中文标点和逗号拆分成片段
+  const segments = input.split(/[,，。；;！!？?\n]+/).map(s => s.trim()).filter(Boolean);
+  const allTags = [];
+  const transLog = [];
+
+  for (const seg of segments) {
+    if (!hasChinese(seg)) {
+      // 已经是英文，直接用
+      allTags.push(seg);
+      continue;
+    }
+
+    // 1. 先用短语词典提取已知标签
+    const { matched, remainder } = extractPhrases(seg);
+    for (const m of matched) {
+      allTags.push(m.en);
+      transLog.push(`${m.zh} → ${m.en}`);
+    }
+
+    // 2. 剩余中文用翻译 API
+    if (remainder && hasChinese(remainder)) {
+      const translated = await translateRemaining(remainder);
+      if (translated !== remainder) {
+        const tags = toSDTags(translated);
+        if (tags) {
+          allTags.push(tags);
+          transLog.push(`${remainder} → ${tags}`);
+        }
+      } else {
+        allTags.push(remainder);
+      }
+    } else if (remainder && !hasChinese(remainder)) {
+      const tags = toSDTags(remainder);
+      if (tags) allTags.push(tags);
+    }
+  }
+
+  return { tags: allTags, log: transLog };
+}
+
+let generating = false;
+
+async function generate() {
+  if (generating) return;
+  const userRaw = document.getElementById('userInput').value.trim();
+
+  const tagParts = [];
+  for (const [tag, w] of Object.entries(selected)) {
+    tagParts.push(formatTag(tag, w));
+  }
+
+  if (!userRaw && tagParts.length === 0) { alert('请输入关键词或选择标签'); return; }
+
+  const el = document.getElementById('output');
+  const genBtn = document.querySelector('.btn');
+
+  // 如果有中文输入，显示加载状态
+  if (userRaw && hasChinese(userRaw)) {
+    generating = true;
+    genBtn.textContent = '⏳ 翻译中...';
+    genBtn.style.opacity = '0.6';
+    el.innerHTML = '<div style="color:#999;padding:20px;text-align:center">正在智能拆解翻译中文描述...</div>';
+  }
+
+  try {
+    let userTags = [];
+    let transLog = [];
+
+    if (userRaw) {
+      if (hasChinese(userRaw)) {
+        const result = await smartTranslate(userRaw);
+        userTags = result.tags;
+        transLog = result.log;
+      } else {
+        userTags = userRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+      }
+    }
+
+    const positive = [...userTags, ...tagParts];
+    if (positive.length === 0) { alert('翻译结果为空，请换个描述试试'); return; }
+
+    const posStr = positive.join(', ');
+    const negStr = NEGATIVE_PRESETS[selectedNeg] || NEGATIVE_PRESETS['通用高质量'];
+
+    let transNote = '';
+    if (transLog.length > 0) {
+      transNote = `<div style="margin-top:10px;font-size:12px;color:#89b4fa;background:#1e1e2e;padding:12px 14px;border-radius:6px;line-height:1.8">` +
+        `📖 翻译对照：<br>${esc(transLog.join('\n'))}</div>`;
+    }
+
+    el.innerHTML =
+      `<div><div class="output-label">✅ 正向提示词 (Positive Prompt)</div>` +
+      `<div class="output-box" id="posBox"><span class="copy-btn" onclick="copyText('posBox')">复制</span>${esc(posStr)}</div>${transNote}</div>` +
+      `<div style="margin-top:14px"><div class="output-label output-neg">❌ 反向提示词 (Negative Prompt) — ${esc(selectedNeg)}</div>` +
+      `<div class="output-box" id="negBox"><span class="copy-btn" onclick="copyText('negBox')">复制</span>${esc(negStr)}</div></div>`;
+  } catch (e) {
+    el.innerHTML = `<div style="color:#e74c3c;padding:16px">生成失败：${esc(e.message)}</div>`;
+  } finally {
+    generating = false;
+    genBtn.textContent = '🚀 生成提示词';
+    genBtn.style.opacity = '1';
+  }
+}
+
+function randomFill() {
+  const pool = Object.values(TAG_DB).flat();
+  const picks = [];
+  const used = new Set();
+  while (picks.length < 6) {
+    const t = pool[Math.floor(Math.random() * pool.length)];
+    if (!used.has(t)) { used.add(t); picks.push(t); }
+  }
+  document.getElementById('userInput').value = picks.join(', ');
+}
+
+function clearAll() {
+  document.getElementById('userInput').value = '';
+  document.getElementById('output').innerHTML = '';
+  for (const tag of Object.keys(selected)) delete selected[tag];
+  document.querySelectorAll('.tag.selected').forEach(el => {
+    el.classList.remove('selected');
+    const t = el.dataset.tag;
+    if (t) el.innerHTML = t;
+  });
+}
+
+function copyText(id) {
+  const el = document.getElementById(id);
+  // 获取纯文本，排除复制按钮的文字
+  const clone = el.cloneNode(true);
+  clone.querySelector('.copy-btn')?.remove();
+  navigator.clipboard.writeText(clone.textContent.trim()).then(() => {
+    const btn = el.querySelector('.copy-btn');
+    btn.textContent = '已复制';
+    setTimeout(() => btn.textContent = '复制', 1500);
+  });
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+initTags();
+// 默认选中通用高质量
+document.querySelector('.tag[data-neg="通用高质量"]')?.classList.add('selected');
+</script>
+</body>
+</html>

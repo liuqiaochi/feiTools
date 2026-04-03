@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时间戳转换 - 老肥工具箱</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+  .topbar { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 14px; }
+  .topbar a { color: rgba(255,255,255,.85); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 4px; transition: color .2s; }
+  .topbar a:hover { color: #fff; }
+  .topbar h1 { font-size: 18px; font-weight: 600; }
+  .container { max-width: 720px; margin: 28px auto; padding: 0 16px; }
+  .panel { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; font-family: "SF Mono","Fira Code",monospace; transition: border .2s; }
+  input:focus { outline: none; border-color: #667eea; }
+  .btn { display: inline-block; padding: 9px 22px; border: none; border-radius: 6px; background: #667eea; color: #fff; font-size: 14px; cursor: pointer; transition: background .2s; margin-right: 8px; margin-top: 8px; }
+  .btn:hover { background: #5a6fd6; }
+  .row { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-end; }
+  .row > div { flex: 1; }
+  .result-box { margin-top: 16px; padding: 14px; background: #f7f8fc; border-radius: 8px; font-family: "SF Mono","Fira Code",monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+  .switch-group { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 14px; }
+  .switch-group span { cursor: pointer; padding: 4px 12px; border-radius: 4px; }
+  .switch-group span.active { background: #667eea; color: #fff; }
+  .error { color: #e74c3c; }
+  .success { color: #27ae60; }
+  hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="../index.html">← 返回首页</a>
+  <h1>⏱ 时间戳转换</h1>
+</div>
+<div class="container">
+  <div class="panel">
+    <div class="switch-group">
+      <span>单位：</span>
+      <span id="unit-s" class="active" onclick="setUnit('s')">秒 (s)</span>
+      <span id="unit-ms" onclick="setUnit('ms')">毫秒 (ms)</span>
+    </div>
+    <div class="row">
+      <div>
+        <label>当前时间戳</label>
+        <input type="text" id="currentTs" readonly>
+      </div>
+      <div><button class="btn" onclick="refreshNow()">刷新</button></div>
+    </div>
+    <hr>
+    <div class="row">
+      <div>
+        <label>时间戳 → 日期时间</label>
+        <input type="text" id="tsInput" placeholder="输入时间戳">
+      </div>
+      <div><button class="btn" onclick="tsToDate()">转换</button></div>
+    </div>
+    <div id="tsResult" class="result-box" style="display:none"></div>
+    <hr>
+    <div class="row">
+      <div>
+        <label>日期时间 → 时间戳</label>
+        <input type="text" id="dateInput" placeholder="如：2025-01-01 12:00:00">
+      </div>
+      <div><button class="btn" onclick="dateToTs()">转换</button></div>
+    </div>
+    <div id="dateResult" class="result-box" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+let unit = 's';
+function setUnit(u) {
+  unit = u;
+  document.getElementById('unit-s').classList.toggle('active', u === 's');
+  document.getElementById('unit-ms').classList.toggle('active', u === 'ms');
+  refreshNow();
+}
+function refreshNow() {
+  const now = Date.now();
+  document.getElementById('currentTs').value = unit === 's' ? Math.floor(now / 1000) : now;
+}
+function tsToDate() {
+  const el = document.getElementById('tsResult');
+  const val = document.getElementById('tsInput').value.trim();
+  if (!val || isNaN(val)) { show(el, '<span class="error">请输入有效的时间戳</span>'); return; }
+  let ms = Number(val);
+  if (String(Math.floor(ms)).length <= 10) ms *= 1000;
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) { show(el, '<span class="error">无效时间戳</span>'); return; }
+  const pad = n => String(n).padStart(2, '0');
+  const str = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  show(el, `<span class="success">${str}</span>\n秒级时间戳：${Math.floor(ms/1000)}\n毫秒级时间戳：${ms}`);
+}
+function dateToTs() {
+  const el = document.getElementById('dateResult');
+  const val = document.getElementById('dateInput').value.trim();
+  if (!val) { show(el, '<span class="error">请输入日期时间</span>'); return; }
+  const d = new Date(val.replace(/-/g, '/'));
+  if (isNaN(d.getTime())) { show(el, '<span class="error">无法解析日期，请使用格式：2025-01-01 12:00:00</span>'); return; }
+  const s = Math.floor(d.getTime() / 1000);
+  show(el, `<span class="success">秒级时间戳：${s}\n毫秒级时间戳：${d.getTime()}</span>`);
+}
+function show(el, html) { el.style.display = 'block'; el.innerHTML = html; }
+refreshNow();
+setInterval(refreshNow, 1000);
+</script>
+</body>
+</html>

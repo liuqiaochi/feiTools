@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON 格式化 - 老肥工具箱</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+  .topbar { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 14px; }
+  .topbar a { color: rgba(255,255,255,.85); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 4px; transition: color .2s; }
+  .topbar a:hover { color: #fff; }
+  .topbar h1 { font-size: 18px; font-weight: 600; }
+  .container { max-width: 900px; margin: 28px auto; padding: 0 16px; }
+  .panel { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; }
+  textarea { width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; font-family: "SF Mono","Fira Code",monospace; transition: border .2s; resize: vertical; min-height: 120px; }
+  textarea:focus { outline: none; border-color: #667eea; }
+  .btn { display: inline-block; padding: 9px 22px; border: none; border-radius: 6px; background: #667eea; color: #fff; font-size: 14px; cursor: pointer; transition: background .2s; margin-right: 8px; margin-top: 8px; }
+  .btn:hover { background: #5a6fd6; }
+  .btn-outline { background: transparent; color: #667eea; border: 1px solid #667eea; }
+  .btn-outline:hover { background: #f0f1ff; }
+  .result-box { margin-top: 16px; padding: 14px; background: #1e1e2e; border-radius: 8px; font-family: "SF Mono","Fira Code",monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; max-height: 500px; overflow: auto; color: #cdd6f4; line-height: 1.6; }
+  .error { color: #e74c3c; }
+  .json-key { font-weight: 600; }
+  .json-str { color: #a6e3a1; }
+  .json-num { color: #fab387; }
+  .json-bool { color: #f38ba8; }
+  .json-null { color: #6c7086; font-style: italic; }
+  .json-d0 .json-key { color: #89b4fa; }
+  .json-d1 .json-key { color: #f5c2e7; }
+  .json-d2 .json-key { color: #a6e3a1; }
+  .json-d3 .json-key { color: #fab387; }
+  .json-d4 .json-key { color: #cba6f7; }
+  .json-d5 .json-key { color: #f38ba8; }
+  .json-bracket { font-weight: 700; }
+  .json-d0 > .json-bracket { color: #89b4fa; }
+  .json-d1 > .json-bracket { color: #f5c2e7; }
+  .json-d2 > .json-bracket { color: #a6e3a1; }
+  .json-d3 > .json-bracket { color: #fab387; }
+  .json-d4 > .json-bracket { color: #cba6f7; }
+  .json-d5 > .json-bracket { color: #f38ba8; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="../index.html">← 返回首页</a>
+  <h1>📋 JSON 格式化</h1>
+</div>
+<div class="container">
+  <div class="panel">
+    <label>输入 JSON 字符串</label>
+    <textarea id="jsonInput" rows="8" placeholder="粘贴 JSON 内容..."></textarea>
+    <input type="file" id="jsonFileInput" accept=".json,.txt" style="display:none" onchange="importJson(event)">
+    <div>
+      <button class="btn" onclick="formatJson()">格式化</button>
+      <button class="btn btn-outline" onclick="compressJson()">压缩</button>
+      <button class="btn btn-outline" onclick="copyJson()">复制结果</button>
+      <button class="btn btn-outline" onclick="document.getElementById('jsonFileInput').click()">📂 导入文件</button>
+      <button class="btn btn-outline" onclick="exportJson()">💾 导出文件</button>
+    </div>
+    <div id="jsonResult" class="result-box" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+function highlightJson(val, depth) {
+  if (depth === undefined) depth = 0;
+  const dc = 'json-d' + (depth % 6);
+  const indent = '  '.repeat(depth);
+  const indent1 = '  '.repeat(depth + 1);
+  if (val === null) return '<span class="json-null">null</span>';
+  if (typeof val === 'boolean') return '<span class="json-bool">' + val + '</span>';
+  if (typeof val === 'number') return '<span class="json-num">' + val + '</span>';
+  if (typeof val === 'string') return '<span class="json-str">"' + escHtml(val) + '"</span>';
+  if (Array.isArray(val)) {
+    if (val.length === 0) return '<span class="' + dc + '"><span class="json-bracket">[]</span></span>';
+    let items = val.map(v => indent1 + highlightJson(v, depth + 1));
+    return '<span class="' + dc + '"><span class="json-bracket">[</span>\n' + items.join(',\n') + '\n' + indent + '<span class="json-bracket">]</span></span>';
+  }
+  const keys = Object.keys(val);
+  if (keys.length === 0) return '<span class="' + dc + '"><span class="json-bracket">{}</span></span>';
+  let entries = keys.map(k =>
+    indent1 + '<span class="' + dc + '"><span class="json-key">"' + escHtml(k) + '"</span></span>: ' + highlightJson(val[k], depth + 1)
+  );
+  return '<span class="' + dc + '"><span class="json-bracket">{</span></span>\n' + entries.join(',\n') + '\n' + indent + '<span class="' + dc + '"><span class="json-bracket">}</span></span>';
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function show(el, html) { el.style.display = 'block'; el.innerHTML = html; }
+
+function formatJson() {
+  const el = document.getElementById('jsonResult');
+  const val = document.getElementById('jsonInput').value.trim();
+  if (!val) { show(el, '<span class="error">请输入 JSON</span>'); return; }
+  try { show(el, highlightJson(JSON.parse(val), 0)); }
+  catch (e) { show(el, '<span class="error">JSON 解析失败：' + e.message + '</span>'); }
+}
+function compressJson() {
+  const el = document.getElementById('jsonResult');
+  const val = document.getElementById('jsonInput').value.trim();
+  if (!val) { show(el, '<span class="error">请输入 JSON</span>'); return; }
+  try { show(el, escHtml(JSON.stringify(JSON.parse(val)))); }
+  catch (e) { show(el, '<span class="error">JSON 解析失败：' + e.message + '</span>'); }
+}
+function copyJson() {
+  const el = document.getElementById('jsonResult');
+  if (!el.textContent) return;
+  navigator.clipboard.writeText(el.textContent).then(() => alert('已复制到剪贴板'));
+}
+function importJson(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { document.getElementById('jsonInput').value = ev.target.result; formatJson(); };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+function exportJson() {
+  const el = document.getElementById('jsonResult');
+  let content = el.textContent;
+  if (!content) {
+    const val = document.getElementById('jsonInput').value.trim();
+    if (!val) { alert('没有可导出的内容'); return; }
+    try { content = JSON.stringify(JSON.parse(val), null, 2); } catch { alert('JSON 格式有误，无法导出'); return; }
+  }
+  const blob = new Blob([content], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'formatted.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>

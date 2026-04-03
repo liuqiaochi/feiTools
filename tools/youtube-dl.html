@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouTube 解析下载 - 老肥工具箱</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.topbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px}
+.topbar a{color:rgba(255,255,255,.85);text-decoration:none;font-size:14px;transition:color .2s}
+.topbar a:hover{color:#fff}
+.topbar h1{font-size:18px;font-weight:600}
+.container{max-width:800px;margin:28px auto;padding:0 16px 60px}
+.panel{background:#fff;border-radius:12px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:20px}
+label{display:block;font-size:14px;color:#666;margin-bottom:6px}
+input[type="text"]{width:100%;padding:12px 14px;border:1px solid #d9d9d9;border-radius:8px;font-size:15px;transition:border .2s;font-family:inherit}
+input[type="text"]:focus{outline:none;border-color:#667eea}
+.btn{display:inline-block;padding:10px 28px;border:none;border-radius:8px;background:#667eea;color:#fff;font-size:15px;cursor:pointer;transition:background .2s;margin-top:12px}
+.btn:hover{background:#5a6fd6}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:7px 18px;font-size:13px;margin-top:0}
+.btn-outline{background:transparent;color:#667eea;border:1px solid #667eea}
+.btn-outline:hover{background:#f0f1ff}
+.btn-red{background:#ff4444}
+.btn-red:hover{background:#e03030}
+.btn-green{background:#27ae60}
+.btn-green:hover{background:#219a52}
+
+.video-info{display:flex;gap:20px;margin-top:20px}
+.video-thumb{width:320px;flex-shrink:0;border-radius:10px;overflow:hidden;position:relative;background:#f0f0f0}
+.video-thumb img{width:100%;display:block;border-radius:10px}
+.video-thumb .dl-cover{position:absolute;bottom:8px;right:8px;padding:5px 12px;border-radius:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;cursor:pointer;transition:background .2s;border:none}
+.video-thumb .dl-cover:hover{background:rgba(102,126,234,.8)}
+.video-detail{flex:1;min-width:0}
+.video-title{font-size:17px;font-weight:600;line-height:1.5;margin-bottom:8px}
+.video-meta{font-size:13px;color:#888;line-height:1.8}
+.video-meta span{margin-right:16px}
+
+.section-title{font-size:14px;font-weight:600;color:#555;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:#eee}
+
+.dl-table{width:100%;border-collapse:collapse}
+.dl-table th{text-align:left;font-size:12px;color:#999;font-weight:500;padding:8px 10px;border-bottom:1px solid #eee}
+.dl-table td{padding:10px;border-bottom:1px solid #f5f5f5;font-size:13px;color:#555}
+.dl-table tr:hover{background:#f9f9ff}
+.quality-badge{display:inline-block;padding:2px 10px;border-radius:50px;font-size:11px;font-weight:600}
+.q-high{background:#e8f5e9;color:#2e7d32}
+.q-mid{background:#fff3e0;color:#e65100}
+.q-low{background:#f3e5f5;color:#7b1fa2}
+.q-audio{background:#e3f2fd;color:#1565c0}
+
+.loading{text-align:center;padding:40px;color:#999}
+.loading .spinner{width:36px;height:36px;border:3px solid #e0e0e0;border-top-color:#667eea;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error{color:#e74c3c;padding:16px;text-align:center}
+.hint{font-size:12px;color:#aaa;margin-top:8px}
+
+.api-config{background:#f7f8fc;border-radius:8px;padding:14px 16px;margin-top:14px;font-size:13px}
+.api-config summary{cursor:pointer;color:#667eea;font-weight:500;font-size:13px;user-select:none}
+.api-config summary:hover{text-decoration:underline}
+.api-row{display:flex;gap:8px;margin-top:10px;align-items:center}
+.api-row select,.api-row input{flex:1;padding:8px 10px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;font-family:inherit}
+.api-row select:focus,.api-row input:focus{outline:none;border-color:#667eea}
+.api-row button{padding:8px 16px;white-space:nowrap}
+.api-status{font-size:12px;margin-top:6px;color:#888}
+.api-status.ok{color:#27ae60}
+.api-status.fail{color:#e74c3c}
+
+.direct-dl{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:18px;margin-bottom:6px}
+.direct-dl-title{font-size:14px;font-weight:600;color:#166534;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.direct-dl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.direct-dl-card{background:#fff;border:1px solid #d1fae5;border-radius:8px;padding:12px;text-align:center;transition:all .15s}
+.direct-dl-card:hover{border-color:#667eea;box-shadow:0 2px 8px rgba(102,126,234,.12)}
+.direct-dl-card .dl-format{font-size:12px;color:#888;margin-bottom:6px}
+.direct-dl-card .dl-quality{font-size:15px;font-weight:600;color:#333;margin-bottom:8px}
+.direct-dl-card a{display:inline-block;padding:6px 20px;border-radius:6px;background:#667eea;color:#fff;text-decoration:none;font-size:13px;transition:background .15s}
+.direct-dl-card a:hover{background:#5a6fd6}
+.direct-dl-loading{text-align:center;padding:20px;color:#888;font-size:13px}
+.direct-dl-error{color:#e74c3c;font-size:13px;padding:8px 0}
+
+.cmd-box{background:#1e1e2e;border-radius:8px;padding:12px 14px;font-family:"SF Mono","Fira Code",monospace;font-size:12.5px;color:#cdd6f4;line-height:1.7;position:relative;margin-bottom:10px;word-break:break-all;white-space:pre-wrap}
+.cmd-box .cmd-copy{position:absolute;top:8px;right:8px;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#cdd6f4;font-size:11px;cursor:pointer;transition:all .15s;font-family:inherit}
+.cmd-box .cmd-copy:hover{background:rgba(255,255,255,.14)}
+.cmd-label{font-size:12px;color:#888;margin-bottom:4px}
+.ytdlp-note{font-size:12px;color:#999;line-height:1.7;margin-bottom:14px}
+.ytdlp-note a{color:#667eea}
+.ytdlp-note code{background:#f0f1ff;padding:1px 6px;border-radius:3px;font-size:11px;color:#667eea}
+
+@media(max-width:640px){
+  .video-info{flex-direction:column}
+  .video-thumb{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="../index.html">← 返回首页</a>
+  <h1>▶️ YouTube 解析下载</h1>
+</div>
+<div class="container">
+  <div class="panel">
+    <label>输入 YouTube 视频链接</label>
+    <input type="text" id="urlInput" placeholder="https://www.youtube.com/watch?v=... 或 https://youtu.be/...">
+    <div class="hint">支持 youtube.com/watch、youtu.be、youtube.com/shorts 等格式</div>
+    <button class="btn" id="parseBtn" onclick="parseVideo()">🔍 解析视频</button>
+    <details class="api-config">
+      <summary>⚙️ 解析 API 设置（直接下载需要）</summary>
+      <div class="api-row">
+        <select id="apiSelect" onchange="onApiSelect()">
+          <option value="https://api.cobalt.tools">cobalt 官方 (api.cobalt.tools)</option>
+          <option value="self-hosted">🖥 自建服务器（推荐）</option>
+          <option value="custom">自定义 Cobalt API...</option>
+        </select>
+        <input type="text" id="apiCustom" placeholder="http://你的服务器IP:5000" style="display:none">
+        <button class="btn btn-sm" onclick="testApi()">测试连接</button>
+      </div>
+      <div class="api-status" id="apiStatus">选择"自建服务器"并填入地址，可实现服务器端 yt-dlp 下载，速度最快最稳定</div>
+      <div style="font-size:11px;color:#aaa;margin-top:6px">
+        自建服务部署：将 <code style="background:#f0f1ff;padding:1px 5px;border-radius:3px;font-size:10px;color:#667eea">server/</code> 目录上传到你的云服务器，
+        运行 <code style="background:#f0f1ff;padding:1px 5px;border-radius:3px;font-size:10px;color:#667eea">pip install -r requirements.txt && pip install yt-dlp && python app.py</code>
+      </div>
+    </details>
+  </div>
+  <div id="result"></div>
+</div>
+
+<script>
+// ═══ 提取视频 ID ═══
+function extractVideoId(url) {
+  url = url.trim();
+  let m;
+  // youtube.com/watch?v=ID
+  m = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtu.be/ID
+  m = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtube.com/embed/ID or /shorts/ID or /v/ID
+  m = url.match(/youtube\.com\/(?:embed|shorts|v)\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // 直接是 ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+  return null;
+}
+
+// ═══ 封面图 URL ═══
+function getThumbnails(vid) {
+  return {
+    maxres: `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`,
+    hq: `https://img.youtube.com/vi/${vid}/hqdefault.jpg`,
+    mq: `https://img.youtube.com/vi/${vid}/mqdefault.jpg`,
+    sd: `https://img.youtube.com/vi/${vid}/sddefault.jpg`,
+  };
+}
+
+// ═══ 使用 noembed 获取基本信息 ═══
+async function fetchVideoInfo(vid) {
+  // noembed.com 是免费的 oEmbed 代理，无需 API key
+  const url = `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${vid}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return {
+    title: data.title || '未知标题',
+    author: data.author_name || '未知',
+    authorUrl: data.author_url || '',
+    thumbnail: data.thumbnail_url || getThumbnails(vid).hq,
+  };
+}
+
+// ═══ 第三方下载 API 列表 ═══
+const DL_APIS = [
+  {
+    name: 'y2mate',
+    getUrl: (vid) => `https://yt-dl.org/api/button/mp4/${vid}`,
+    type: 'redirect'
+  },
+  {
+    name: 'cobalt',
+    getUrl: (vid) => `https://cobalt.tools/?url=https://youtube.com/watch?v=${vid}`,
+    type: 'redirect'
+  },
+  {
+    name: 'ssyoutube',
+    getUrl: (vid) => `https://ssyoutube.com/watch?v=${vid}`,
+    type: 'redirect'
+  },
+  {
+    name: '9xbuddy',
+    getUrl: (vid) => `https://9xbuddy.com/process?url=https://www.youtube.com/watch?v=${vid}`,
+    type: 'redirect'
+  },
+  {
+    name: 'savefrom',
+    getUrl: (vid) => `https://en.savefrom.net/1-youtube-video-downloader-20/?url=https://www.youtube.com/watch?v=${vid}`,
+    type: 'redirect'
+  }
+];
+
+// ═══ 解析 ═══
+let currentVid = null;
+
+async function parseVideo() {
+  const input = document.getElementById('urlInput').value;
+  const vid = extractVideoId(input);
+  const el = document.getElementById('result');
+
+  if (!vid) {
+    el.innerHTML = '<div class="panel"><div class="error">无法识别视频链接，请检查 URL 格式</div></div>';
+    return;
+  }
+
+  currentVid = vid;
+  const btn = document.getElementById('parseBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 解析中...';
+  el.innerHTML = '<div class="panel"><div class="loading"><div class="spinner"></div>正在获取视频信息...</div></div>';
+
+  try {
+    const info = await fetchVideoInfo(vid);
+    const thumbs = getThumbnails(vid);
+    renderResult(vid, info, thumbs);
+  } catch (e) {
+    // 即使 API 失败，也可以用 vid 展示基本信息
+    const thumbs = getThumbnails(vid);
+    renderResult(vid, { title: '视频信息获取失败（仍可下载）', author: '-', authorUrl: '' }, thumbs);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 解析视频';
+  }
+}
+
+function renderResult(vid, info, thumbs) {
+  const el = document.getElementById('result');
+  const ytUrl = `https://www.youtube.com/watch?v=${vid}`;
+
+  el.innerHTML = `
+    <div class="panel">
+      <div class="video-info">
+        <div class="video-thumb">
+          <img src="${esc(thumbs.hq)}" alt="封面" onerror="this.src='${esc(thumbs.mq)}'">
+          <button class="dl-cover" onclick="downloadCover('${vid}')">📷 下载封面</button>
+        </div>
+        <div class="video-detail">
+          <div class="video-title">${esc(info.title)}</div>
+          <div class="video-meta">
+            <span>👤 ${info.authorUrl ? '<a href="'+esc(info.authorUrl)+'" target="_blank" style="color:#667eea;text-decoration:none">'+esc(info.author)+'</a>' : esc(info.author)}</span>
+            <span>🆔 ${esc(vid)}</span>
+          </div>
+          <div style="margin-top:12px">
+            <a href="${esc(ytUrl)}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px">▶️ 在 YouTube 打开</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">⚡ 直接下载（API 解析）</div>
+      <div id="directDl">
+        <div class="direct-dl-loading"><div class="spinner" style="width:24px;height:24px;border:2px solid #e0e0e0;border-top-color:#667eea;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px"></div>正在通过 API 解析下载链接...</div>
+      </div>
+
+      <div class="section-title">📷 封面图片</div>
+      <table class="dl-table">
+        <tr><th>分辨率</th><th>预览</th><th>操作</th></tr>
+        <tr>
+          <td><span class="quality-badge q-high">最高清</span> maxresdefault</td>
+          <td><img src="${esc(thumbs.maxres)}" style="height:40px;border-radius:4px" onerror="this.parentElement.parentElement.style.display='none'"></td>
+          <td><button class="btn btn-sm btn-green" onclick="openImg('${esc(thumbs.maxres)}')">下载</button></td>
+        </tr>
+        <tr>
+          <td><span class="quality-badge q-mid">高清</span> hqdefault</td>
+          <td><img src="${esc(thumbs.hq)}" style="height:40px;border-radius:4px"></td>
+          <td><button class="btn btn-sm btn-green" onclick="openImg('${esc(thumbs.hq)}')">下载</button></td>
+        </tr>
+        <tr>
+          <td><span class="quality-badge q-low">标清</span> mqdefault</td>
+          <td><img src="${esc(thumbs.mq)}" style="height:40px;border-radius:4px"></td>
+          <td><button class="btn btn-sm btn-green" onclick="openImg('${esc(thumbs.mq)}')">下载</button></td>
+        </tr>
+      </table>
+
+      <div class="section-title">🎬 视频下载</div>
+      <p style="font-size:13px;color:#888;margin-bottom:12px">由于浏览器限制，视频下载通过第三方服务完成，点击后跳转到对应平台</p>
+      <table class="dl-table">
+        <tr><th>下载服务</th><th>支持格式</th><th>操作</th></tr>
+        ${DL_APIS.map(api => `
+        <tr>
+          <td style="font-weight:500">${esc(api.name)}</td>
+          <td><span class="quality-badge q-high">MP4</span> <span class="quality-badge q-audio">MP3</span></td>
+          <td><a href="${esc(api.getUrl(vid))}" target="_blank" class="btn btn-sm btn-red" style="text-decoration:none;display:inline-block">前往下载</a></td>
+        </tr>`).join('')}
+      </table>
+
+      <div class="section-title">🎵 音频提取</div>
+      <table class="dl-table">
+        <tr><th>服务</th><th>格式</th><th>操作</th></tr>
+        <tr>
+          <td style="font-weight:500">cobalt.tools</td>
+          <td><span class="quality-badge q-audio">MP3 / WAV / OGG</span></td>
+          <td><a href="https://cobalt.tools/?url=${encodeURIComponent(ytUrl)}" target="_blank" class="btn btn-sm" style="text-decoration:none;display:inline-block;background:#1565c0">前往提取</a></td>
+        </tr>
+        <tr>
+          <td style="font-weight:500">ytmp3.cc</td>
+          <td><span class="quality-badge q-audio">MP3 320kbps</span></td>
+          <td><a href="https://ytmp3.cc/youtube-to-mp3/?url=${encodeURIComponent(ytUrl)}" target="_blank" class="btn btn-sm" style="text-decoration:none;display:inline-block;background:#1565c0">前往提取</a></td>
+        </tr>
+      </table>
+      <div class="section-title">🖥 yt-dlp 命令行</div>
+      <p class="ytdlp-note">
+        需要本地安装 <a href="https://github.com/yt-dlp/yt-dlp" target="_blank">yt-dlp</a>，
+        安装方式：<code>pip install yt-dlp</code> 或 <code>brew install yt-dlp</code>，点击命令右上角一键复制
+      </p>
+
+      <div class="cmd-label">📹 下载最佳画质视频 + 音频（自动合并）</div>
+      <div class="cmd-box" id="cmd1">yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" "${ytUrl}" -o "%(title)s.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd1')">复制</button></div>
+
+      <div class="cmd-label">📹 下载 1080p 视频</div>
+      <div class="cmd-box" id="cmd2">yt-dlp -f "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]" "${ytUrl}" -o "%(title)s_1080p.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd2')">复制</button></div>
+
+      <div class="cmd-label">📹 下载 720p 视频</div>
+      <div class="cmd-box" id="cmd3">yt-dlp -f "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]" "${ytUrl}" -o "%(title)s_720p.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd3')">复制</button></div>
+
+      <div class="cmd-label">🎵 仅下载音频（MP3 格式）</div>
+      <div class="cmd-box" id="cmd4">yt-dlp -x --audio-format mp3 --audio-quality 0 "${ytUrl}" -o "%(title)s.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd4')">复制</button></div>
+
+      <div class="cmd-label">🎵 仅下载音频（FLAC 无损）</div>
+      <div class="cmd-box" id="cmd5">yt-dlp -x --audio-format flac "${ytUrl}" -o "%(title)s.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd5')">复制</button></div>
+
+      <div class="cmd-label">📷 仅下载封面图</div>
+      <div class="cmd-box" id="cmd6">yt-dlp --write-thumbnail --skip-download "${ytUrl}" -o "%(title)s.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd6')">复制</button></div>
+
+      <div class="cmd-label">📝 下载字幕（自动生成 + 手动字幕）</div>
+      <div class="cmd-box" id="cmd7">yt-dlp --write-subs --write-auto-subs --sub-langs "zh-Hans,en" --skip-download "${ytUrl}" -o "%(title)s.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd7')">复制</button></div>
+
+      <div class="cmd-label">🎬 下载视频 + 字幕 + 封面（全套）</div>
+      <div class="cmd-box" id="cmd8">yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best" --write-thumbnail --write-subs --write-auto-subs --sub-langs "zh-Hans,en" --embed-subs --embed-thumbnail "${ytUrl}" -o "%(title)s.%(ext)s"<button class="cmd-copy" onclick="copyCmd('cmd8')">复制</button></div>
+
+      <div class="cmd-label">📋 查看所有可用格式（不下载）</div>
+      <div class="cmd-box" id="cmd9">yt-dlp -F "${ytUrl}"<button class="cmd-copy" onclick="copyCmd('cmd9')">复制</button></div>
+    </div>`;
+
+  // 自动尝试 API 直接解析
+  fetchDirectLinks(vid);
+}
+
+// ═══ 下载封面 ═══
+function downloadCover(vid) {
+  const thumbs = getThumbnails(vid);
+  // 尝试最高清，失败则用 hq
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/jpeg', 0.95);
+    a.download = `youtube_${vid}_cover.jpg`;
+    a.click();
+  };
+  img.onerror = function() {
+    // 回退：直接打开图片
+    window.open(thumbs.hq, '_blank');
+  };
+  img.src = thumbs.maxres;
+}
+
+function openImg(url) {
+  // 尝试用 canvas 下载，失败则新窗口打开
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/jpeg', 0.95);
+    a.download = 'youtube_cover.jpg';
+    a.click();
+  };
+  img.onerror = function() { window.open(url, '_blank'); };
+  img.src = url;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ═══ API 配置 ═══
+function getApiMode() {
+  const sel = document.getElementById('apiSelect').value;
+  if (sel === 'self-hosted') return { mode: 'self', url: document.getElementById('apiCustom').value.trim().replace(/\/+$/, '') };
+  if (sel === 'custom') return { mode: 'cobalt', url: document.getElementById('apiCustom').value.trim().replace(/\/+$/, '') };
+  return { mode: 'cobalt', url: sel };
+}
+
+function onApiSelect() {
+  const sel = document.getElementById('apiSelect').value;
+  const custom = document.getElementById('apiCustom');
+  if (sel === 'self-hosted') {
+    custom.style.display = '';
+    custom.placeholder = 'http://你的服务器IP:5000';
+    // 尝试从 localStorage 恢复
+    custom.value = localStorage.getItem('yt_self_host') || custom.value;
+  } else if (sel === 'custom') {
+    custom.style.display = '';
+    custom.placeholder = 'https://your-cobalt-api.com';
+  } else {
+    custom.style.display = 'none';
+  }
+}
+
+async function testApi() {
+  const status = document.getElementById('apiStatus');
+  const { mode, url } = getApiMode();
+  if ((mode === 'self' || document.getElementById('apiSelect').value === 'custom') && !url) {
+    status.textContent = '请输入服务器地址'; status.className = 'api-status fail'; return;
+  }
+  // 保存自建服务器地址
+  if (mode === 'self' && url) localStorage.setItem('yt_self_host', url);
+
+  status.textContent = '测试中...'; status.className = 'api-status';
+  try {
+    const testUrl = mode === 'self' ? url : url;
+    const resp = await fetch(testUrl, { signal: AbortSignal.timeout(8000) });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => null);
+      const name = data?.service || data?.cobalt || 'API';
+      const ffmpeg = data?.ffmpeg;
+      let extra = '';
+      if (ffmpeg === true) extra = ' | ✅ ffmpeg 可用';
+      else if (ffmpeg === false) extra = ' | ⚠️ 未安装 ffmpeg，建议安装以获得最佳画质';
+      status.textContent = `✅ 连接成功 (${name})${extra}`;
+      status.className = 'api-status ok';
+    } else {
+      status.textContent = `⚠️ 返回 ${resp.status}，可能仍可用`;
+      status.className = 'api-status ok';
+    }
+  } catch (e) {
+    status.textContent = '❌ 无法连接: ' + e.message;
+    status.className = 'api-status fail';
+  }
+}
+
+// ═══ 直接下载（自建服务器模式）═══
+async function fetchDirectLinks_SelfHosted(vid) {
+  const container = document.getElementById('directDl');
+  const { url: apiBase } = getApiMode();
+  const ytUrl = `https://www.youtube.com/watch?v=${vid}`;
+
+  if (!apiBase) {
+    container.innerHTML = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;font-size:13px">
+      <div style="color:#991b1b;font-weight:500">⚠️ 请先在上方设置中填入你的服务器地址</div></div>`;
+    return;
+  }
+
+  const modes = [
+    { id: 'best', label: '最佳画质', icon: '🎬', badge: 'q-high' },
+    { id: '1080', label: '1080p', icon: '🎬', badge: 'q-high' },
+    { id: '720', label: '720p', icon: '🎬', badge: 'q-mid' },
+    { id: '480', label: '480p', icon: '🎬', badge: 'q-low' },
+    { id: 'audio_mp3', label: 'MP3 音频', icon: '🎵', badge: 'q-audio' },
+    { id: 'audio_best', label: '最佳音频', icon: '🎵', badge: 'q-audio' },
+  ];
+
+  container.innerHTML = `<div class="direct-dl">
+    <div class="direct-dl-title">🖥 服务器下载（yt-dlp）</div>
+    <div class="direct-dl-grid">${modes.map(m => `
+      <div class="direct-dl-card" id="dlcard-${m.id}">
+        <div class="dl-format">${m.icon} <span class="quality-badge ${m.badge}">${m.label}</span></div>
+        <div style="margin-top:8px">
+          <button class="btn btn-sm" onclick="startServerDownload('${vid}','${m.id}','${esc(m.label)}')">开始下载</button>
+        </div>
+        <div class="dl-status" id="dlstatus-${m.id}" style="font-size:11px;color:#888;margin-top:6px"></div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+async function startServerDownload(vid, mode, label) {
+  const { url: apiBase } = getApiMode();
+  const ytUrl = `https://www.youtube.com/watch?v=${vid}`;
+  const statusEl = document.getElementById(`dlstatus-${mode}`);
+  const cardEl = document.getElementById(`dlcard-${mode}`);
+
+  statusEl.innerHTML = '⏳ 提交下载任务...';
+
+  try {
+    const resp = await fetch(`${apiBase}/api/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: ytUrl, mode }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    const taskId = data.task_id;
+    statusEl.innerHTML = '⏳ 下载中 0%...';
+
+    // 轮询任务状态
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`${apiBase}/api/task/${taskId}`, { signal: AbortSignal.timeout(10000) });
+        const t = await r.json();
+
+        if (t.status === 'downloading') {
+          statusEl.innerHTML = `⏳ 下载中 ${t.progress || '...'}`;
+        } else if (t.status === 'done') {
+          clearInterval(poll);
+          const size = t.filesize ? ` (${formatSize(t.filesize)})` : '';
+          statusEl.innerHTML = `✅ 完成${size}`;
+          // 替换按钮为下载链接
+          const btnArea = cardEl.querySelector('.btn');
+          if (btnArea) {
+            btnArea.outerHTML = `<a href="${apiBase}${t.download_url}" class="btn btn-sm btn-green" style="text-decoration:none;display:inline-block" download>⬇ 下载文件</a>`;
+          }
+        } else if (t.status === 'error') {
+          clearInterval(poll);
+          statusEl.innerHTML = `<span style="color:#e74c3c">❌ ${esc(t.error || '下载失败')}</span>`;
+        }
+      } catch (e) {
+        clearInterval(poll);
+        statusEl.innerHTML = `<span style="color:#e74c3c">❌ 查询失败</span>`;
+      }
+    }, 1500);
+
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color:#e74c3c">❌ ${esc(e.message)}</span>`;
+  }
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+
+// ═══ 直接下载（Cobalt API 模式）═══
+async function fetchDirectLinks_Cobalt(vid) {
+  const container = document.getElementById('directDl');
+  const { url: api } = getApiMode();
+  const ytUrl = `https://www.youtube.com/watch?v=${vid}`;
+
+  const requests = [
+    { label: '最佳视频+音频', payload: { url: ytUrl, downloadMode: 'auto' } },
+    { label: '1080p 视频', payload: { url: ytUrl, downloadMode: 'auto', videoQuality: '1080' } },
+    { label: '720p 视频', payload: { url: ytUrl, downloadMode: 'auto', videoQuality: '720' } },
+    { label: '480p 视频', payload: { url: ytUrl, downloadMode: 'auto', videoQuality: '480' } },
+    { label: '仅音频 (MP3)', payload: { url: ytUrl, downloadMode: 'audio', audioFormat: 'mp3' } },
+    { label: '仅音频 (最佳)', payload: { url: ytUrl, downloadMode: 'audio', audioFormat: 'best' } },
+  ];
+
+  try {
+    const results = await Promise.allSettled(
+      requests.map(async (req) => {
+        const resp = await fetch(api, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(req.payload),
+          signal: AbortSignal.timeout(15000),
+        });
+        const data = await resp.json();
+        return { ...req, data };
+      })
+    );
+
+    const cards = results
+      .filter(r => r.status === 'fulfilled' && r.value.data.url)
+      .map(r => {
+        const { label, data } = r.value;
+        const isAudio = label.includes('音频');
+        return `<div class="direct-dl-card">
+          <div class="dl-format">${isAudio ? '🎵 音频' : '🎬 视频'}</div>
+          <div class="dl-quality">${esc(label)}</div>
+          <a href="${esc(data.url)}" target="_blank" rel="noopener">⬇ 下载</a>
+        </div>`;
+      });
+
+    if (cards.length > 0) {
+      container.innerHTML = `<div class="direct-dl">
+        <div class="direct-dl-title">✅ Cobalt 解析成功</div>
+        <div class="direct-dl-grid">${cards.join('')}</div>
+      </div>`;
+    } else {
+      throw new Error('未获取到可用下载链接');
+    }
+  } catch (e) {
+    container.innerHTML = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;font-size:13px">
+      <div style="color:#991b1b;font-weight:500;margin-bottom:6px">⚠️ Cobalt API 解析失败</div>
+      <div style="color:#888">${esc(e.message)}</div>
+      <div style="color:#999;margin-top:8px;font-size:12px">请尝试切换到"自建服务器"模式，或使用下方的第三方服务和 yt-dlp 命令。</div>
+    </div>`;
+  }
+}
+
+// ═══ 统一入口 ═══
+async function fetchDirectLinks(vid) {
+  const { mode } = getApiMode();
+  if (mode === 'self') {
+    await fetchDirectLinks_SelfHosted(vid);
+  } else {
+    await fetchDirectLinks_Cobalt(vid);
+  }
+}
+
+function copyCmd(id) {
+  const el = document.getElementById(id);
+  const clone = el.cloneNode(true);
+  clone.querySelector('.cmd-copy')?.remove();
+  const text = clone.textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = el.querySelector('.cmd-copy');
+    btn.textContent = '已复制';
+    setTimeout(() => btn.textContent = '复制', 1500);
+  });
+}
+
+// 回车触发
+document.getElementById('urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') parseVideo(); });
+</script>
+</body>
+</html>
