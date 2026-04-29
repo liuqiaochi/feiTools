@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pixiv 搜图 - 老肥工具箱</title>
+  <script src="../theme.js"></script>
   <style>
     :root {
       --bg: #f0f2f5;
@@ -17,6 +18,21 @@
       --text2: #888888;
       --text3: #bbbbbb;
       --radius: 12px;
+      --modal-left-bg: #f5f5f5;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f0f17;
+      --surface: #1a1a28;
+      --surface2: #1e1e2e;
+      --surface3: #252535;
+      --border: #2a2a3e;
+      --accent: #8b9cf7;
+      --accent-dim: rgba(139,156,247,0.12);
+      --text: #e0e0ec;
+      --text2: #888888;
+      --text3: #555566;
+      --modal-left-bg: #12121e;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -26,6 +42,7 @@
       color: var(--text);
       font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
       min-height: 100vh;
+      transition: background .3s, color .3s;
     }
 
     /* ── Header ── */
@@ -380,7 +397,7 @@
     .modal-left {
       flex: 1;
       min-width: 0;
-      background: #f5f5f5;
+      background: var(--modal-left-bg);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -623,7 +640,7 @@
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
     /* ── Topbar ── */
     .topbar { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 14px; }

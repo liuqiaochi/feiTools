@@ -4,22 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JSON 格式化 - 老肥工具箱</title>
+<script src="../theme.js"></script>
 <style>
+  :root{--bg:#f0f2f5;--surface:#fff;--text:#333;--text2:#666;--border:#d9d9d9;--input-bg:#fff;--panel-shadow:0 2px 12px rgba(0,0,0,.06);--accent:#667eea;--btn-outline-hover:#f0f1ff}
+  [data-theme="dark"]{--bg:#0f0f17;--surface:#1a1a28;--text:#e0e0ec;--text2:#aaa;--border:#333;--input-bg:#1e1e2e;--panel-shadow:0 2px 12px rgba(0,0,0,.2);--accent:#8b9cf7;--btn-outline-hover:rgba(139,156,247,.1)}
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background .3s, color .3s; }
   .topbar { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 14px; }
   .topbar a { color: rgba(255,255,255,.85); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 4px; transition: color .2s; }
   .topbar a:hover { color: #fff; }
   .topbar h1 { font-size: 18px; font-weight: 600; }
   .container { max-width: 900px; margin: 28px auto; padding: 0 16px; }
-  .panel { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-  label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; }
-  textarea { width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; font-family: "SF Mono","Fira Code",monospace; transition: border .2s; resize: vertical; min-height: 120px; }
-  textarea:focus { outline: none; border-color: #667eea; }
-  .btn { display: inline-block; padding: 9px 22px; border: none; border-radius: 6px; background: #667eea; color: #fff; font-size: 14px; cursor: pointer; transition: background .2s; margin-right: 8px; margin-top: 8px; }
+  .panel { background: var(--surface); border-radius: 12px; padding: 28px; box-shadow: var(--panel-shadow); }
+  label { display: block; font-size: 14px; color: var(--text2); margin-bottom: 6px; }
+  textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: "SF Mono","Fira Code",monospace; transition: border .2s; resize: vertical; min-height: 120px; background: var(--input-bg); color: var(--text); }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .btn { display: inline-block; padding: 9px 22px; border: none; border-radius: 6px; background: var(--accent); color: #fff; font-size: 14px; cursor: pointer; transition: background .2s; margin-right: 8px; margin-top: 8px; }
   .btn:hover { background: #5a6fd6; }
-  .btn-outline { background: transparent; color: #667eea; border: 1px solid #667eea; }
-  .btn-outline:hover { background: #f0f1ff; }
+  .btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .btn-outline:hover { background: var(--btn-outline-hover); }
   .result-box { margin-top: 16px; padding: 14px; background: #1e1e2e; border-radius: 8px; font-family: "SF Mono","Fira Code",monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; max-height: 500px; overflow: auto; color: #cdd6f4; line-height: 1.6; }
   .error { color: #e74c3c; }
   .json-key { font-weight: 600; }

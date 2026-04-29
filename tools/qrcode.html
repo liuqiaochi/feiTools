@@ -6,6 +6,7 @@
 <title>二维码工具 - 老肥工具箱</title>
 <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="../theme.js"></script>
 <script>
 // 检查库是否加载成功，如果没有则用备用 CDN
 if (typeof qrcode === 'undefined') {
@@ -16,41 +17,43 @@ if (typeof jsQR === 'undefined') {
 }
 </script>
 <style>
+  :root{--bg:#f0f2f5;--surface:#fff;--text:#333;--text2:#666;--text3:#999;--border:#d9d9d9;--input-bg:#fff;--panel-shadow:0 2px 12px rgba(0,0,0,.06);--accent:#667eea;--btn-outline-hover:#f0f1ff;--settings-bg:#f7f8fc;--decode-result-bg:#f7f8fc;--tab-bg:#fff;--tab-hover:#e8eaff;--drop-hover-bg:#f5f6ff}
+  [data-theme="dark"]{--bg:#0f0f17;--surface:#1a1a28;--text:#e0e0ec;--text2:#aaa;--text3:#666;--border:#333;--input-bg:#1e1e2e;--panel-shadow:0 2px 12px rgba(0,0,0,.2);--accent:#8b9cf7;--btn-outline-hover:rgba(139,156,247,.1);--settings-bg:#1e1e2e;--decode-result-bg:#1e1e2e;--tab-bg:#1a1a28;--tab-hover:rgba(139,156,247,.15);--drop-hover-bg:rgba(139,156,247,.08)}
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background .3s, color .3s; }
   .topbar { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 14px; }
   .topbar a { color: rgba(255,255,255,.85); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 4px; transition: color .2s; }
   .topbar a:hover { color: #fff; }
   .topbar h1 { font-size: 18px; font-weight: 600; }
   .container { max-width: 900px; margin: 28px auto; padding: 0 16px 60px; }
   .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
-  .tabs button { padding: 10px 24px; border: none; border-radius: 8px; background: #fff; cursor: pointer; font-size: 15px; color: #555; box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: all .2s; }
-  .tabs button.active { background: #667eea; color: #fff; }
-  .tabs button:hover:not(.active) { background: #e8eaff; }
-  .panel { display: none; background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+  .tabs button { padding: 10px 24px; border: none; border-radius: 8px; background: var(--tab-bg); cursor: pointer; font-size: 15px; color: var(--text2); box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: all .2s; }
+  .tabs button.active { background: var(--accent); color: #fff; }
+  .tabs button:hover:not(.active) { background: var(--tab-hover); }
+  .panel { display: none; background: var(--surface); border-radius: 12px; padding: 28px; box-shadow: var(--panel-shadow); }
   .panel.active { display: block; }
-  label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; }
-  textarea, input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; transition: border .2s; }
-  textarea:focus, input[type="text"]:focus { outline: none; border-color: #667eea; }
+  label { display: block; font-size: 14px; color: var(--text2); margin-bottom: 6px; }
+  textarea, input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; transition: border .2s; background: var(--input-bg); color: var(--text); }
+  textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--accent); }
   textarea { resize: vertical; min-height: 80px; font-family: inherit; }
-  .btn { display: inline-block; padding: 9px 22px; border: none; border-radius: 6px; background: #667eea; color: #fff; font-size: 14px; cursor: pointer; transition: background .2s; margin-right: 8px; margin-top: 8px; }
+  .btn { display: inline-block; padding: 9px 22px; border: none; border-radius: 6px; background: var(--accent); color: #fff; font-size: 14px; cursor: pointer; transition: background .2s; margin-right: 8px; margin-top: 8px; }
   .btn:hover { background: #5a6fd6; }
-  .btn-outline { background: transparent; color: #667eea; border: 1px solid #667eea; }
-  .btn-outline:hover { background: #f0f1ff; }
-  .settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin: 18px 0; padding: 18px; background: #f7f8fc; border-radius: 10px; }
+  .btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .btn-outline:hover { background: var(--btn-outline-hover); }
+  .settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin: 18px 0; padding: 18px; background: var(--settings-bg); border-radius: 10px; }
   .settings label { margin-bottom: 0; }
-  .settings input[type="number"] { width: 100%; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; }
-  .settings input[type="number"]:focus { outline: none; border-color: #667eea; }
-  .settings input[type="color"] { width: 100%; height: 36px; border: 1px solid #d9d9d9; border-radius: 6px; cursor: pointer; padding: 2px; }
-  .settings select { width: 100%; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; background: #fff; }
-  .settings select:focus { outline: none; border-color: #667eea; }
+  .settings input[type="number"] { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--input-bg); color: var(--text); }
+  .settings input[type="number"]:focus { outline: none; border-color: var(--accent); }
+  .settings input[type="color"] { width: 100%; height: 36px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 2px; background: var(--input-bg); }
+  .settings select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: var(--input-bg); color: var(--text); }
+  .settings select:focus { outline: none; border-color: var(--accent); }
   .qr-output { margin-top: 20px; text-align: center; }
   .qr-output canvas { border-radius: 8px; box-shadow: 0 2px 16px rgba(0,0,0,.08); max-width: 100%; }
-  .drop-zone { border: 2px dashed #d9d9d9; border-radius: 10px; padding: 48px 20px; text-align: center; color: #999; cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 16px; }
-  .drop-zone:hover, .drop-zone.dragover { border-color: #667eea; background: #f5f6ff; }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 48px 20px; text-align: center; color: var(--text3); cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 16px; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: var(--drop-hover-bg); }
   .drop-zone p { font-size: 15px; margin-bottom: 6px; }
-  .drop-zone small { font-size: 12px; color: #bbb; }
-  .decode-result { margin-top: 16px; padding: 14px; background: #f7f8fc; border-radius: 8px; font-family: "SF Mono","Fira Code",monospace; font-size: 13px; word-break: break-all; white-space: pre-wrap; }
+  .drop-zone small { font-size: 12px; color: var(--text3); }
+  .decode-result { margin-top: 16px; padding: 14px; background: var(--decode-result-bg); color: var(--text); border-radius: 8px; font-family: "SF Mono","Fira Code",monospace; font-size: 13px; word-break: break-all; white-space: pre-wrap; }
   .decode-preview { margin-top: 12px; text-align: center; }
   .decode-preview img { max-width: 260px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
   .error { color: #e74c3c; }
