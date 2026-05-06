@@ -3,3 +3,8 @@ server/downloads/
 *.pyc
 __pycache__/
 .DS_Store
+
+# IDE
+.workbuddy/
+.vscode/
+.idea/
