@@ -7,7 +7,7 @@
   1. pip install -r requirements.txt
   2. 确保已安装 yt-dlp: pip install yt-dlp
   3. python app.py
-  4. 前端填入 http://你的服务器IP:5000
+  4. 前端填入 http://你的服务器IP:5001
 """
 
 import os
@@ -27,7 +27,7 @@ CORS(app)
 DOWNLOAD_DIR = Path(os.environ.get('DOWNLOAD_DIR', './downloads'))
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 MAX_FILE_AGE = 3600  # 文件保留 1 小时
-PORT = int(os.environ.get('PORT', 5000))
+PORT = int(os.environ.get('PORT', 5001))
 
 # ── 检测 ffmpeg ──
 HAS_FFMPEG = False

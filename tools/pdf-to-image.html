@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF 转图片 - 老肥工具箱</title>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="../theme.js"></script>
+<style>
+:root{--bg:#f0f2f5;--surface:#fff;--text:#333;--text2:#666;--text3:#999;--border:#d9d9d9;--input-bg:#fff;--panel-shadow:0 2px 12px rgba(0,0,0,.06);--result-bg:#f7f8fc;--accent:#667eea;--error:#e74c3c;--success:#27ae60;--drop-border:#ccc;--drop-hover:#e8eaff}
+[data-theme="dark"]{--bg:#0f0f17;--surface:#1a1a28;--text:#e0e0ec;--text2:#aaa;--text3:#666;--border:#333;--input-bg:#1e1e2e;--panel-shadow:0 2px 12px rgba(0,0,0,.2);--result-bg:#1e1e2e;--accent:#8b9cf7;--error:#f87171;--success:#4ade80;--drop-border:#444;--drop-hover:rgba(102,126,234,.1)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
+.topbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 20px;display:flex;align-items:center;gap:14px}
+.topbar a{color:rgba(255,255,255,.85);text-decoration:none;font-size:14px;transition:color .2s}
+.topbar a:hover{color:#fff}
+.topbar h1{font-size:18px;font-weight:600}
+.container{max-width:800px;margin:28px auto;padding:0 16px 60px}
+.panel{background:var(--surface);border-radius:12px;padding:28px;box-shadow:var(--panel-shadow);margin-bottom:20px}
+.drop-zone{border:2px dashed var(--drop-border);border-radius:10px;padding:48px 20px;text-align:center;color:var(--text3);cursor:pointer;transition:border-color .2s,background .2s}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:var(--drop-hover)}
+.drop-zone p{font-size:15px;margin-bottom:6px;color:var(--text2)}
+.drop-zone small{font-size:12px}
+.settings{display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;align-items:center}
+.settings label{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px}
+.settings select,.settings input[type="number"]{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--input-bg);color:var(--text)}
+.settings select:focus,.settings input[type="number"]:focus{outline:none;border-color:var(--accent)}
+.btn{display:inline-block;padding:10px 24px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:14px;cursor:pointer;transition:background .2s;margin-top:14px}
+.btn:hover{background:#5a6fd6}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn-outline:hover{background:var(--drop-hover)}
+.file-list{margin-top:16px}
+.file-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--result-bg);border-radius:6px;margin-bottom:6px;font-size:13px}
+.file-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.file-item .size{color:var(--text3);font-size:12px}
+.file-item .remove{cursor:pointer;color:var(--error);font-size:16px;padding:0 4px}
+.progress-wrap{margin-top:16px;display:none}
+.progress-bar{height:6px;background:var(--result-bg);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .2s;width:0}
+.progress-text{font-size:12px;color:var(--text2);margin-top:6px}
+.preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:16px}
+.preview-item{border-radius:8px;overflow:hidden;background:var(--result-bg);position:relative}
+.preview-item img{width:100%;display:block}
+.preview-item .page-num{position:absolute;bottom:4px;right:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="../index.html">← 返回首页</a>
+  <h1>📄 PDF 转图片</h1>
+</div>
+<div class="container">
+  <div class="panel">
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <p>点击选择或拖拽 PDF 文件到此处</p>
+      <small>支持多个 PDF 文件，每页转为一张图片</small>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(event)">
+    <div class="file-list" id="fileList"></div>
+    <div class="settings">
+      <label>输出格式
+        <select id="format">
+          <option value="png">PNG</option>
+          <option value="jpeg">JPEG</option>
+          <option value="webp">WebP</option>
+        </select>
+      </label>
+      <label>缩放倍数
+        <select id="scale">
+          <option value="1">1x (72dpi)</option>
+          <option value="1.5">1.5x (108dpi)</option>
+          <option value="2" selected>2x (144dpi)</option>
+          <option value="3">3x (216dpi)</option>
+        </select>
+      </label>
+      <label>JPEG 质量
+        <input type="number" id="quality" value="90" min="10" max="100" step="5" style="width:60px">
+      </label>
+    </div>
+    <div>
+      <button class="btn" id="convertBtn" onclick="startConvert()" disabled>🚀 开始转换</button>
+      <button class="btn btn-outline" id="clearBtn" onclick="clearAll()" style="display:none;margin-left:8px">🗑 清空</button>
+    </div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">准备中...</div>
+    </div>
+  </div>
+  <div class="panel" id="resultPanel" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:14px;font-weight:600;color:var(--text)">📷 转换结果</span>
+      <button class="btn" id="downloadBtn" onclick="downloadZip()">💾 下载 ZIP</button>
+    </div>
+    <div class="preview-grid" id="previewGrid"></div>
+  </div>
+</div>
+
+<script type="module">
+import * as pdfjsLib from 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+
+let pdfFiles = [];
+let convertedImages = [];
+
+window.handleFiles = function(e) {
+  addFiles(Array.from(e.target.files || []));
+  e.target.value = '';
+};
+
+window.startConvert = startConvert;
+window.clearAll = clearAll;
+window.downloadZip = downloadZip;
+window.removeFile = function(i) { pdfFiles.splice(i, 1); renderFileList(); };
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  addFiles(Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf'));
+});
+
+function addFiles(files) {
+  for (const f of files) if (f.type === 'application/pdf') pdfFiles.push(f);
+  renderFileList();
+}
+
+function renderFileList() {
+  const el = document.getElementById('fileList');
+  document.getElementById('convertBtn').disabled = pdfFiles.length === 0;
+  document.getElementById('clearBtn').style.display = pdfFiles.length ? 'inline-block' : 'none';
+  el.innerHTML = pdfFiles.map((f, i) => `
+    <div class="file-item">
+      <span class="name">📄 ${esc(f.name)}</span>
+      <span class="size">${fmtSize(f.size)}</span>
+      <span class="remove" onclick="removeFile(${i})">✕</span>
+    </div>`).join('');
+}
+
+function clearAll() {
+  pdfFiles = []; convertedImages = [];
+  renderFileList();
+  document.getElementById('resultPanel').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'none';
+}
+
+async function startConvert() {
+  if (!pdfFiles.length) return;
+  const format = document.getElementById('format').value;
+  const scale = parseFloat(document.getElementById('scale').value);
+  const quality = parseInt(document.getElementById('quality').value) / 100;
+  const mime = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+  const ext = format === 'jpeg' ? 'jpg' : format;
+
+  convertedImages = [];
+  const pw = document.getElementById('progressWrap');
+  const pf = document.getElementById('progressFill');
+  const pt = document.getElementById('progressText');
+  const btn = document.getElementById('convertBtn');
+  pw.style.display = 'block'; btn.disabled = true; btn.textContent = '⏳ 转换中...';
+
+  let totalPages = 0;
+  const docs = [];
+  for (const file of pdfFiles) {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    docs.push({ pdf, name: file.name.replace(/\.pdf$/i, '') });
+    totalPages += pdf.numPages;
+  }
+
+  let done = 0;
+  for (const { pdf, name } of docs) {
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const vp = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = vp.width; canvas.height = vp.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+      const blob = await new Promise(r => canvas.toBlob(r, mime, quality));
+      const url = URL.createObjectURL(blob);
+      const pageName = pdf.numPages > 1 ? `${name}_p${String(p).padStart(3,'0')}.${ext}` : `${name}.${ext}`;
+      convertedImages.push({ name: pageName, blob, url });
+
+      done++;
+      pf.style.width = Math.round(done / totalPages * 100) + '%';
+      pt.textContent = `转换中... ${done}/${totalPages} 页`;
+    }
+  }
+
+  pt.textContent = `✅ 完成！共 ${totalPages} 页`;
+  btn.disabled = false; btn.textContent = '🚀 开始转换';
+  renderPreview();
+}
+
+function renderPreview() {
+  document.getElementById('resultPanel').style.display = 'block';
+  document.getElementById('previewGrid').innerHTML = convertedImages.map((img, i) => `
+    <div class="preview-item">
+      <img src="${img.url}" alt="第${i+1}页" loading="lazy">
+      <span class="page-num">${esc(img.name)}</span>
+    </div>`).join('');
+}
+
+async function downloadZip() {
+  if (!convertedImages.length) return;
+  const btn = document.getElementById('downloadBtn');
+  btn.disabled = true; btn.textContent = '⏳ 打包中...';
+  const zip = new JSZip();
+  for (const img of convertedImages) zip.file(img.name, img.blob);
+  const content = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(content);
+  a.download = pdfFiles.length === 1 ? pdfFiles[0].name.replace(/\.pdf$/i, '_images.zip') : 'pdf_images.zip';
+  a.click(); URL.revokeObjectURL(a.href);
+  btn.disabled = false; btn.textContent = '💾 下载 ZIP';
+}
+
+function fmtSize(b) { return b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB'; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
