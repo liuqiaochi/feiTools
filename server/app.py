@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-老肥工具箱 - YouTube 下载后端服务
-部署到你的云服务器，前端页面通过 API 调用 yt-dlp 下载视频。
+老肥工具箱 - 视频下载后端服务
+支持 YouTube、Bilibili 等平台，部署到你的云服务器，前端页面通过 API 调用 yt-dlp 下载视频。
 
 使用方式：
   1. pip install -r requirements.txt
   2. 确保已安装 yt-dlp: pip install yt-dlp
   3. python app.py
   4. 前端填入 http://你的服务器IP:5001
+
+支持平台：YouTube、Bilibili（BV/av号）、b23.tv 短链等
 """
 
 import os
@@ -28,6 +30,7 @@ DOWNLOAD_DIR = Path(os.environ.get('DOWNLOAD_DIR', './downloads'))
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 MAX_FILE_AGE = 3600  # 文件保留 1 小时
 PORT = int(os.environ.get('PORT', 5001))
+COOKIES_FILE = Path(__file__).parent / 'cookies.txt'
 
 # ── 检测 ffmpeg ──
 HAS_FFMPEG = False
@@ -61,14 +64,117 @@ def cleanup_old_files():
 threading.Thread(target=cleanup_old_files, daemon=True).start()
 
 
+# ═══════════════════════════════════════════════════════════
+# Bilibili 辅助函数
+# ═══════════════════════════════════════════════════════════
+
+def is_bilibili(url):
+    """判断是否为 Bilibili 链接"""
+    return any(d in url for d in ['bilibili.com', 'b23.tv', 'bilibili.tv'])
+
+
+def validate_netscape_cookies(filepath):
+    """检查 cookies.txt 是否为有效的 Netscape 格式"""
+    try:
+        content = filepath.read_text(encoding='utf-8')
+        lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith('#')]
+        if not lines:
+            return False, '文件为空'
+        for i, line in enumerate(lines):
+            parts = line.split('\t')
+            if len(parts) < 7:
+                return False, f'第 {i+1} 行字段不足（{len(parts)}/7），可能不是 Netscape 格式'
+        return True, f'有效（{len(lines)} 条 Cookie）'
+    except Exception as e:
+        return False, str(e)
+
+
+def generate_netscape_cookies(sessdata, bili_jct='', dedeuserid=''):
+    """根据 B站 Cookie 值生成 Netscape 格式 cookies.txt 内容"""
+    lines = [
+        '# Netscape HTTP Cookie File',
+        '# https://curl.se/docs/http-cookies.html',
+        '# This is a generated file! Do not edit.',
+        '',
+    ]
+    expire = int(time.time()) + 30 * 86400
+    if sessdata:
+        lines.append(f'.bilibili.com\tTRUE\t/\tTRUE\t{expire}\tSESSDATA\t{sessdata}')
+    if bili_jct:
+        lines.append(f'.bilibili.com\tTRUE\t/\tTRUE\t{expire}\tbili_jct\t{bili_jct}')
+    if dedeuserid:
+        lines.append(f'.bilibili.com\tTRUE\t/\tTRUE\t{expire}\tDedeUserID\t{dedeuserid}')
+    return '\n'.join(lines) + '\n'
+
+
+def bilibili_extra_args(url):
+    """Bilibili 专用 yt-dlp 参数，解决 412 Precondition Failed"""
+    if not is_bilibili(url):
+        return []
+    args = [
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        '--referer', 'https://www.bilibili.com',
+        '--add-header', 'Referer: https://www.bilibili.com',
+    ]
+    # 如果存在有效的 cookies.txt，自动使用（用于解锁 1080P+ 画质）
+    if COOKIES_FILE.exists():
+        valid, _ = validate_netscape_cookies(COOKIES_FILE)
+        if valid:
+            args += ['--cookies', str(COOKIES_FILE)]
+    return args
+
+
+# ═══════════════════════════════════════════════════════════
+# 路由
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/')
 def index():
+    cookies_valid = False
+    cookies_msg = ''
+    if COOKIES_FILE.exists():
+        cookies_valid, cookies_msg = validate_netscape_cookies(COOKIES_FILE)
     return jsonify({
-        'service': '老肥工具箱 YouTube 下载服务',
+        'service': '老肥工具箱视频下载服务',
         'status': 'running',
         'ffmpeg': HAS_FFMPEG,
-        'endpoints': ['/api/info', '/api/formats', '/api/download', '/api/task/<id>', '/downloads/<file>']
+        'bilibili_cookies': cookies_valid,
+        'cookies_detail': cookies_msg,
+        'endpoints': ['/api/info', '/api/formats', '/api/download', '/api/task/<id>', '/api/cookies', '/downloads/<file>']
     })
+
+
+@app.route('/api/cookies', methods=['GET', 'POST', 'DELETE'])
+def manage_cookies():
+    """管理 Bilibili Cookie 文件"""
+    if request.method == 'GET':
+        if not COOKIES_FILE.exists():
+            return jsonify({'exists': False, 'valid': False})
+        valid, msg = validate_netscape_cookies(COOKIES_FILE)
+        return jsonify({'exists': True, 'valid': valid, 'detail': msg})
+
+    if request.method == 'DELETE':
+        try:
+            COOKIES_FILE.unlink(missing_ok=True)
+            return jsonify({'ok': True, 'message': 'cookies.txt 已删除'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # POST: 通过 SESSDATA 等值生成 Netscape 格式 cookies.txt
+    data = request.get_json() or {}
+    sessdata = data.get('sessdata', '').strip()
+    bili_jct = data.get('bili_jct', '').strip()
+    dedeuserid = data.get('dedeuserid', '').strip()
+
+    if not sessdata:
+        return jsonify({'error': '缺少 sessdata 参数（必填）'}), 400
+
+    try:
+        content = generate_netscape_cookies(sessdata, bili_jct, dedeuserid)
+        COOKIES_FILE.write_text(content, encoding='utf-8')
+        return jsonify({'ok': True, 'message': 'cookies.txt 已生成（Netscape 格式）'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/info', methods=['POST'])
@@ -81,7 +187,7 @@ def video_info():
 
     try:
         result = subprocess.run(
-            ['yt-dlp', '--dump-json', '--no-download', url],
+            ['yt-dlp', '--no-update', '--dump-json', '--no-download'] + bilibili_extra_args(url) + [url],
             capture_output=True, text=True, timeout=30
         )
         if result.returncode != 0:
@@ -113,7 +219,7 @@ def video_formats():
 
     try:
         result = subprocess.run(
-            ['yt-dlp', '-J', '--no-download', url],
+            ['yt-dlp', '--no-update', '-J', '--no-download'] + bilibili_extra_args(url) + [url],
             capture_output=True, text=True, timeout=30
         )
         if result.returncode != 0:
@@ -157,13 +263,12 @@ def start_download():
             output_tpl = str(DOWNLOAD_DIR / f'{task_id}_%(title).80s.%(ext)s')
 
             # 构建 yt-dlp 命令
-            cmd = ['yt-dlp', '--no-playlist', '-o', output_tpl, '--newline']
+            cmd = ['yt-dlp', '--no-update', '--no-playlist', '-o', output_tpl, '--newline']
 
             if mode == 'audio_mp3':
                 if HAS_FFMPEG:
                     cmd += ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
                 else:
-                    # 没有 ffmpeg，直接下载最佳音频流（不转码）
                     cmd += ['-f', 'bestaudio[ext=m4a]/bestaudio']
             elif mode == 'audio_best':
                 if HAS_FFMPEG:
@@ -173,25 +278,23 @@ def start_download():
             elif mode in ('1080', '720', '480'):
                 height = mode
                 if HAS_FFMPEG:
-                    # 有 ffmpeg：下载分离的视频+音频流，合并为 mp4
                     cmd += [
                         '-f', f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={height}]+bestaudio/best[height<={height}]',
                         '--merge-output-format', 'mp4',
                     ]
                 else:
-                    # 没有 ffmpeg：只能下载已经包含音视频的单文件
                     cmd += ['-f', f'best[height<={height}][ext=mp4]/best[height<={height}]']
             else:
-                # best 模式
                 if HAS_FFMPEG:
                     cmd += [
                         '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
                         '--merge-output-format', 'mp4',
                     ]
                 else:
-                    # 没有 ffmpeg：下载包含音视频的单文件 mp4
                     cmd += ['-f', 'best[ext=mp4]/best']
 
+            # Bilibili 专用参数（User-Agent + Referer + Cookie）
+            cmd += bilibili_extra_args(url)
             cmd.append(url)
 
             tasks[task_id]['cmd'] = ' '.join(cmd)
@@ -200,10 +303,8 @@ def start_download():
             for line in proc.stdout:
                 line = line.strip()
                 output_log.append(line)
-                # 只保留最后 50 行日志
                 if len(output_log) > 50:
                     output_log.pop(0)
-                # 解析进度
                 if '[download]' in line and '%' in line:
                     try:
                         pct = line.split('%')[0].split()[-1]
@@ -214,13 +315,11 @@ def start_download():
             proc.wait()
             if proc.returncode != 0:
                 tasks[task_id]['status'] = 'error'
-                # 提取有用的错误信息
                 err_lines = [l for l in output_log if 'ERROR' in l or 'error' in l.lower()]
                 err_msg = err_lines[-1] if err_lines else '\n'.join(output_log[-5:])
                 tasks[task_id]['error'] = f'yt-dlp 失败: {err_msg}'
                 return
 
-            # 找到下载的文件
             files = sorted(DOWNLOAD_DIR.glob(f'{task_id}_*'), key=lambda f: f.stat().st_mtime, reverse=True)
             if files:
                 tasks[task_id]['status'] = 'done'
@@ -267,7 +366,7 @@ def serve_file(filename):
 
 
 if __name__ == '__main__':
-    print(f'🚀 老肥工具箱下载服务启动在 http://0.0.0.0:{PORT}')
+    print(f'🚀 老肥工具箱视频下载服务启动在 http://0.0.0.0:{PORT}')
     print(f'📁 下载目录: {DOWNLOAD_DIR.resolve()}')
     print(f'⏰ 文件保留时间: {MAX_FILE_AGE}s')
     if HAS_FFMPEG:
@@ -275,4 +374,14 @@ if __name__ == '__main__':
     else:
         print(f'⚠️  未检测到 ffmpeg！视频将以单文件格式下载（画质可能受限），音频无法转为 mp3')
         print(f'   安装方法: apt install ffmpeg (Ubuntu) / yum install ffmpeg (CentOS) / brew install ffmpeg (macOS)')
+    if COOKIES_FILE.exists():
+        valid, msg = validate_netscape_cookies(COOKIES_FILE)
+        if valid:
+            print(f'✅ 检测到 cookies.txt（{msg}），Bilibili 1080P+ 高画质已解锁')
+        else:
+            print(f'⚠️  cookies.txt 格式无效：{msg}')
+            print(f'   请通过页面「设置 Cookie」功能重新配置，或删除该文件')
+    else:
+        print(f'ℹ️  未检测到 cookies.txt，Bilibili 最高仅支持 480p（未登录）')
+        print(f'   如需 1080P+ 画质，请在页面中设置 Cookie，或通过 /api/cookies 接口配置')
     app.run(host='0.0.0.0', port=PORT, debug=False)
